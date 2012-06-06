@@ -16,6 +16,10 @@ using namespace std;
 #include <QList>
 #include <QMap>
 #include <QDir>
+//#include <QJson>
+#include <QVariant>
+#include <QDebug>
+#include <qjson/parser.h>
 
 // MythTV headers
 #include "mythmiscutil.h"
@@ -27,6 +31,7 @@ using namespace std;
 #include "mythdirs.h"
 #include "mythdb.h"
 #include "mythsystem.h"
+#include "mythdownloadmanager.h"
 #include "videosource.h" // for is_grabber..
 
 // filldata headers
@@ -49,6 +54,7 @@ bool updateLastRunEnd(MSqlQuery &query)
         MythDB::DBError("updateLastRunEnd", query);
         return false;
     }
+
     return true;
 }
 
@@ -65,6 +71,7 @@ bool updateLastRunStart(MSqlQuery &query)
         MythDB::DBError("updateLastRunStart", query);
         return false;
     }
+
     return true;
 }
 
@@ -80,6 +87,7 @@ bool updateLastRunStatus(MSqlQuery &query, QString &status)
         MythDB::DBError("updateLastRunStatus", query);
         return false;
     }
+
     return true;
 }
 
@@ -107,7 +115,7 @@ void FillData::DataDirectStationUpdate(Source source, bool update_icons)
 
     bool insert_channels = chan_data.insert_chan(source.id);
     int new_channels = DataDirectProcessor::UpdateChannelsSafe(
-        source.id, insert_channels, chan_data.filter_new_channels);
+                           source.id, insert_channels, chan_data.filter_new_channels);
 
     //  User must pass "--do-channel-updates" for these updates
     if (chan_data.channel_updates)
@@ -115,6 +123,7 @@ void FillData::DataDirectStationUpdate(Source source, bool update_icons)
         DataDirectProcessor::UpdateChannelsUnsafe(
             source.id, chan_data.filter_new_channels);
     }
+
     // TODO delete any channels which no longer exist in listings source
 
     if (update_icons)
@@ -126,23 +135,26 @@ void FillData::DataDirectStationUpdate(Source source, bool update_icons)
     {
         bool ok0 = (logged_in == source.userid);
         bool ok1 = (raw_lineup == source.id);
+
         if (!ok0)
         {
             LOG(VB_GENERAL, LOG_INFO,
                 "Grabbing login cookies for listing update");
             ok0 = ddprocessor.GrabLoginCookiesAndLineups();
         }
+
         if (ok0 && !ok1)
         {
             LOG(VB_GENERAL, LOG_INFO, "Grabbing listing for listing update");
             ok1 = ddprocessor.GrabLineupForModify(source.lineupid);
         }
+
         if (ok1)
         {
             ddprocessor.UpdateListings(source.id);
             LOG(VB_GENERAL, LOG_INFO,
                 QString("Removed %1 channel(s) from lineup.")
-                    .arg(new_channels));
+                .arg(new_channels));
         }
     }
 }
@@ -166,6 +178,7 @@ bool FillData::DataDirectUpdateChannels(Source source)
     ddprocessor.SetPassword(source.password);
 
     bool ok = true;
+
     if (!is_grabber_labs(source.xmltvgrabber))
     {
         ok = ddprocessor.GrabLineupsOnly();
@@ -173,7 +186,7 @@ bool FillData::DataDirectUpdateChannels(Source source)
     else
     {
         ok = ddprocessor.GrabFullLineup(
-            source.lineupid, true, chan_data.insert_chan(source.id)/*only sel*/);
+                 source.lineupid, true, chan_data.insert_chan(source.id)/*only sel*/);
         logged_in  = source.userid;
         raw_lineup = source.id;
     }
@@ -194,7 +207,8 @@ bool FillData::GrabDDData(Source source, int poffset,
         LOG(VB_GENERAL, LOG_INFO,
             QString("This DataDirect listings source is "
                     "shared by %1 MythTV lineups")
-                .arg(source.dd_dups.size()+1));
+            .arg(source.dd_dups.size() + 1));
+
         if (source.id > source.dd_dups[0])
         {
             LOG(VB_GENERAL, LOG_NOTICE,
@@ -205,6 +219,7 @@ bool FillData::GrabDDData(Source source, int poffset,
             LOG(VB_GENERAL, LOG_NOTICE,
                 "We should keep data around after this one");
         }
+
         ddprocessor.SetCacheData(true);
     }
 
@@ -228,9 +243,11 @@ bool FillData::GrabDDData(Source source, int poffset,
     if (needtoretrieve)
     {
         LOG(VB_GENERAL, LOG_INFO, "Retrieving datadirect data.");
+
         if (dd_grab_all)
         {
             LOG(VB_GENERAL, LOG_INFO, "Grabbing ALL available data.");
+
             if (!ddprocessor.GrabAllData())
             {
                 LOG(VB_GENERAL, LOG_ERR, "Encountered error in grabbing data.");
@@ -244,8 +261,8 @@ bool FillData::GrabDDData(Source source, int poffset,
             QDateTime todatetime = fromdatetime.addDays(1);
 
             LOG(VB_GENERAL, LOG_INFO, QString("Grabbing data for %1 offset %2")
-                                          .arg(pdate.toString())
-                                          .arg(poffset));
+                .arg(pdate.toString())
+                .arg(poffset));
             LOG(VB_GENERAL, LOG_INFO, QString("From %1 to %2 (UTC)")
                 .arg(fromdatetime.toString(Qt::ISODate))
                 .arg(todatetime.toString(Qt::ISODate)));
@@ -274,6 +291,7 @@ bool FillData::GrabDDData(Source source, int poffset,
     updateLastRunEnd(query);
 
     LOG(VB_GENERAL, LOG_INFO, "Main temp tables populated.");
+
     if (!channel_update_run)
     {
         LOG(VB_GENERAL, LOG_INFO, "Updating MythTV channels.");
@@ -333,6 +351,7 @@ bool FillData::GrabDataFromFile(int id, QString &filename)
 
     chan_data.handleChannels(id, &chanlist);
     icon_data.UpdateSourceIcons(id);
+
     if (proglist.count() == 0)
     {
         LOG(VB_GENERAL, LOG_INFO, "No programs found in data.");
@@ -342,6 +361,7 @@ bool FillData::GrabDataFromFile(int id, QString &filename)
     {
         prog_data.HandlePrograms(id, proglist);
     }
+
     return true;
 }
 
@@ -350,20 +370,26 @@ bool FillData::GrabData(Source source, int offset, QDate *qCurrentDate)
     QString xmltv_grabber = source.xmltvgrabber;
 
     int dd_provider = get_datadirect_provider(xmltv_grabber);
+
     if (dd_provider >= 0)
     {
         if (!GrabDDData(source, offset, *qCurrentDate, dd_provider))
         {
             QStringList errors = ddprocessor.GetFatalErrors();
+
             for (int i = 0; i < errors.size(); i++)
                 fatalErrors.push_back(errors[i]);
+
             return false;
         }
+
         return true;
     }
 
     const QString templatename = "/tmp/mythXXXXXX";
+
     const QString tempfilename = createTempFile(templatename);
+
     if (templatename == tempfilename)
     {
         fatalErrors.push_back("Failed to create temporary file.");
@@ -380,6 +406,7 @@ bool FillData::GrabData(Source source, int offset, QDate *qCurrentDate)
     query1.prepare("SELECT configpath FROM videosource"
                    " WHERE sourceid = :ID AND configpath IS NOT NULL");
     query1.bindValue(":ID", source.id);
+
     if (!query1.exec())
     {
         MythDB::DBError("FillData::grabData", query1);
@@ -390,13 +417,13 @@ bool FillData::GrabData(Source source, int offset, QDate *qCurrentDate)
         configfile = query1.value(0).toString();
     else
         configfile = QString("%1/%2.xmltv").arg(GetConfDir())
-                                           .arg(source.name);
+                     .arg(source.name);
 
     LOG(VB_GENERAL, LOG_INFO,
         QString("XMLTV config file is: %1").arg(configfile));
 
     QString command = QString("nice %1 --config-file '%2' --output %3")
-        .arg(xmltv_grabber).arg(configfile).arg(filename);
+                      .arg(xmltv_grabber).arg(configfile).arg(filename);
 
     // The one concession to grabber specific behaviour.
     // Will be removed when the grabber allows.
@@ -435,7 +462,7 @@ bool FillData::GrabData(Source source, int offset, QDate *qCurrentDate)
     LOG(VB_XMLTV, LOG_INFO, QString("Grabber Command: %1").arg(command));
 
     LOG(VB_XMLTV, LOG_INFO,
-            "----------------- Start of XMLTV output -----------------");
+        "----------------- Start of XMLTV output -----------------");
 
     unsigned int systemcall_status;
 
@@ -443,7 +470,7 @@ bool FillData::GrabData(Source source, int offset, QDate *qCurrentDate)
     bool succeeded = (systemcall_status == GENERIC_EXIT_OK);
 
     LOG(VB_XMLTV, LOG_INFO,
-            "------------------ End of XMLTV output ------------------");
+        "------------------ End of XMLTV output ------------------");
 
     updateLastRunEnd(query);
 
@@ -461,10 +488,10 @@ bool FillData::GrabData(Source source, int offset, QDate *qCurrentDate)
         {
             status =
                 QString(QObject::tr("FAILED: xmltv returned error code %1."))
-                            .arg(systemcall_status);
+                .arg(systemcall_status);
             LOG(VB_GENERAL, LOG_ERR, LOC +
                 QString("xmltv returned error code %1")
-                    .arg(systemcall_status));
+                .arg(systemcall_status));
         }
     }
 
@@ -496,6 +523,315 @@ bool FillData::GrabDataFromDDFile(
     s.lineupid = lineupid;
 
     return GrabData(s, offset, currentd);
+}
+
+// Process for downloading Schedules Direct JSON data files.
+// Execute a login to http://rkulagow.schedulesdirect.org/login.php
+// Scan the downloaded file for the randhash.
+// Execute a "wget"
+
+// Schedules Direct login
+QString FillData::GetSDLoginRandhash(int sourceid)
+{
+QString randhash="";
+QString username, password;
+
+        QString url = "http://rkulagow.schedulesdirect.org/login.php";
+        QString destdir = "/tmp";
+//        QDir dir;
+            MSqlQuery query(MSqlQuery::InitCon());
+            query.prepare(
+            "SELECT userid, password from FROM videosource WHERE sourceid = :SOURCEID"
+            );
+
+            query.bindValue(":SOURCEID", sourceid);
+            if (!query.exec())
+            {
+                MythDB::DBError("FillData::grabData", query);
+                return false;
+            }
+
+            if (query.next())
+            {
+              username = query.value(0).toString();
+              password = query.value(1).toString();
+            }
+//        bool result = GetMythDownloadManager()->download(url, remoteThemesFile);
+qDebug() << "username: " << username << " password: " << password;
+
+return randhash;
+}
+
+// Schedules Direct download XMLID files.
+bool FillData::DownloadSDFiles(QString &randhash)
+{
+
+return true;
+}
+
+
+// Schedules Direct check for lineup update
+bool FillData::is_SDHeadendVersionUpdated(int id, const QString &lineupid)
+{
+return false;
+}
+
+
+// Schedules Direct json-formatted data
+bool FillData::InsertSDDataintoDatabase(
+    int id, const QString &lineupid)
+{
+    // Information relating to schedules
+    bool subject_to_blackout, educational, time_approximate;
+    bool joined_in_progress, left_in_progress;
+    bool sex_rating, dialog_rating, tv_rating, violence_rating;
+    bool fv_rating, lang_rating;
+    bool is_cc, is_stereo, dolby;
+    bool cable_in_the_classroom;
+    bool is_new, is_enhanced, is_3d, is_hdtv, is_letterboxed, has_dvs;
+    QString network_syndicated_source, network_syndicated_type;
+    QString live_tape_delay;
+    QString is_premiere_or_finale;
+    QString sched_prog_id;
+    QString air_date, air_time;
+    QString season, episode;
+    int duration, part_num, num_parts;
+
+    // Information relating to programs.
+    QString title, reduced_title1, reduced_title2, reduced_title3, reduced_title4;
+    QString epi_title, alt_title;
+    QString descr, reduced_descr1, reduced_descr2, reduced_descr3, descr_500;
+    QString descr2, descr2_reduced;
+    QString descr_lang_id;
+    QString source_type, show_type;
+    QString syn_epi_num, alt_syn_epi_num;
+    QString color_code;
+    QString orig_air_date;
+    bool made_for_tv;
+
+    QString status; //used for status messages logged to the database.
+
+    MSqlQuery startstopstatus_query(MSqlQuery::InitCon());
+
+    updateLastRunStart(startstopstatus_query);
+
+    LOG(VB_GENERAL, LOG_INFO, "Reading schedule files.");
+    status = "Reading schedule files.";
+
+    updateLastRunStatus(startstopstatus_query, status);
+
+    QDir dir;
+    dir = QDir("/tmp");
+    QStringList files;
+    QString searchfor = "*_sched.txt";
+
+    files = dir.entryList(QStringList(searchfor), QDir::Files | QDir::NoSymLinks);
+
+    QStringListIterator j(files);
+
+    while (j.hasNext())
+    {
+
+        QString filename = j.next().toLocal8Bit();
+
+        QFile inputfile("/tmp/" + filename);
+
+        if (!inputfile.open(QIODevice::ReadOnly))
+        {
+            qDebug() << "Couldn't open filename: " << filename;
+            QString status = "Failed to open filename " + filename;
+            updateLastRunStatus(startstopstatus_query, status);
+            return false;
+        }
+
+        QJson::Parser parser;
+        bool ok;
+
+        LOG(VB_GENERAL, LOG_INFO, QString("Loaded file: %1").arg(filename));
+
+        QMap<QString, QString> schedule;
+        QMap<QString, QString> program_information;
+        QString line;
+
+        while (!inputfile.atEnd())
+        {
+            // Read everything into appropriate QMaps first. The largest data file only has around 4000 lines, so not huge.
+            line = inputfile.readLine();
+            QVariantMap result = parser.parse(line.toLocal8Bit(), &ok).toMap(); //json parser wants QByteArray
+
+            if (!ok)
+            {
+                printf("line %d: %s\n", parser.errorLine(), parser.errorString().toUtf8().data());
+                return false;
+            }
+
+            if (result["datatype"].toString() == "schedule")
+            {
+                schedule[result["prog_id"].toString()] = line;
+            }
+            else
+            {
+                program_information[result["prog_id"].toString()] = line;
+            }
+        } // done reading in all the data.
+
+        inputfile.close();
+
+        QMapIterator<QString, QString> i(schedule);
+
+        while (i.hasNext())
+        {
+            // Iterate through all the schedule information for this XMLID.
+            i.next();
+            // qDebug() << i.key() << ": " << i.value();
+
+
+            QVariantMap result = parser.parse(i.value().toLocal8Bit(), &ok).toMap();
+
+            if (!ok)
+            {
+                printf("line %d: %s\n", parser.errorLine(), parser.errorString().toUtf8().data());
+                return false;
+            }
+
+            air_date = result["air_date"].toString();
+            air_time = result["air_time"].toString();
+            duration = result["duration"].toInt();
+            season = result["season"].toString();
+            episode = result["episode"].toString();
+            part_num = result["part_num"].toInt();
+            num_parts = result["num_parts"].toInt();
+
+            subject_to_blackout = result["subject_to_blackout"].toBool();
+            educational = result["educational"].toBool();
+            time_approximate = result["time_approximate"].toBool();
+            joined_in_progress = result["joined_in_progress"].toBool();
+            left_in_progress = result["left_in_progress"].toBool();
+            sex_rating = result["sex_rating"].toBool();
+            dialog_rating = result["dialog_rating"].toBool();
+            tv_rating = result["tv_rating"].toBool();
+            violence_rating = result["violence_rating"].toBool();
+            fv_rating = result["fv_rating"].toBool();
+            lang_rating = result["lang_rating"].toBool();
+            is_cc = result["cc"].toBool();
+            is_stereo = result["stereo"].toBool();
+            dolby = result["dolby"].toBool();
+            cable_in_the_classroom = result["cable_in_the_classroom"].toBool();
+            is_new = result["new"].toBool();
+            is_enhanced = result["enhanced"].toBool();
+            is_3d = result["3d"].toBool();
+            is_hdtv = result["hdtv"].toBool();
+            is_letterboxed = result["letterbox"].toBool();
+            network_syndicated_source = result["net_syn_source"].toString();
+            network_syndicated_type = result["net_syn_type"].toString();
+            live_tape_delay = result["live_tape_delay"].toString();
+            is_premiere_or_finale = result["premiere_finale"].toString();
+
+            QDateTime UTCdt_start = QDateTime::fromString(air_date + " " + air_time, Qt::ISODate);
+            QDateTime UTCdt_end = UTCdt_start.addSecs(duration);
+
+            QVariantMap prog_info = parser.parse(program_information[i.key()].toLocal8Bit(), &ok).toMap();
+            // Use the key (program ID) from the schedule to get the program information for that timeslot.
+            if (!ok)
+            {
+                printf("line %d: %s\n", parser.errorLine(), parser.errorString().toUtf8().data());
+                return false;
+            }
+
+            title = prog_info["title"].toString();
+            epi_title = prog_info["epi_title"].toString();
+            descr = prog_info["descr"].toString();
+            syn_epi_num = prog_info["syn_epi_num"].toString();
+            orig_air_date = prog_info["orig_air_date"].toString();
+
+            MSqlQuery query(MSqlQuery::InitCon());
+            query.prepare(
+            "SELECT chanid FROM channel WHERE xmltvid = :XMLID"
+            );
+
+            query.bindValue(":XMLID", filename.left(5));
+            if (!query.exec())
+            {
+                MythDB::DBError("FillData::grabData", query);
+                return false;
+            }
+
+            int chanid;
+
+            if (query.next())
+            // We're going to update all chanid's in the database that use this particular XMLID.
+            {
+
+              chanid = query.value(0).toInt();
+
+// Temp values
+bool is_subtitled = false;
+
+
+// Living dangerously, or speeding things up?
+// Sanity check on whether the downloaded data is valid first?
+
+            MSqlQuery purge(MSqlQuery::InitCon());
+            purge.prepare(
+                "DELETE FROM program where chanid = :CHANID"
+            );
+
+            purge.bindValue(":CHANID", chanid);
+
+            if (!purge.exec())
+            {
+                MythDB::DBError("Deleting data", purge);
+                return false;
+            }
+
+            MSqlQuery insert(MSqlQuery::InitCon());
+            insert.prepare(
+                "INSERT INTO program ("
+                "chanid, starttime, endtime,"
+                "title, subtitle, description,"
+                "stereo, subtitled, hdtv,"
+                "closecaptioned, partnumber, parttotal,"
+                "seriesid, originalairdate, programid) "
+                "VALUES ("
+                ":CHANID, :STARTTIME, :ENDTIME,"
+                ":TITLE, :SUBTITLE, :DESCRIPTION,"
+                ":STEREO, :SUBTITLED, :HDTV,"
+                ":CLOSECAPTIONED, :PARTNUMBER, :PARTTOTAL,"
+                ":SERIESID, :ORIGINALAIRDATE, :PROGID)");
+
+            insert.bindValue(":CHANID", chanid);
+            insert.bindValue(":STARTTIME", UTCdt_start);
+            insert.bindValue(":ENDTIME", UTCdt_end);
+            insert.bindValue(":TITLE", title);
+            insert.bindValue(":SUBTITLE", epi_title);
+            insert.bindValue(":DESCRIPTION", descr);
+            insert.bindValue(":STEREO", is_stereo);
+            insert.bindValue(":SUBTITLED", is_subtitled);
+            insert.bindValue(":HDTV", is_hdtv);
+            insert.bindValue(":CLOSECAPTIONED", is_cc);
+            insert.bindValue(":PARTNUMBER", part_num);
+            insert.bindValue(":PARTTOTAL", num_parts);
+            insert.bindValue(":SERIESID", syn_epi_num);
+            insert.bindValue(":ORIGINALAIRDATE", orig_air_date);
+            insert.bindValue(":PROGID", i.key());
+
+            if (!insert.exec())
+            {
+                MythDB::DBError("Loading data", insert);
+                return false;
+            }
+            }
+        } // end of the while loop
+    } // end of iterating through all the files.
+
+    updateLastRunEnd(startstopstatus_query);
+
+    status = "Completed download and update of database. Success.";
+    updateLastRunStatus(startstopstatus_query, status);
+
+    return true;
+
+    //    return GrabData(s, offset, currentd);
 }
 
 
@@ -530,6 +866,7 @@ bool FillData::Run(SourceList &sourcelist)
             continue;
 
         has_dd_source = true;
+
         for (it2 = sourcelist.begin(); it2 != sourcelist.end(); ++it2)
         {
             if (((*it).id           != (*it2).id)           &&
@@ -541,6 +878,7 @@ bool FillData::Run(SourceList &sourcelist)
             }
         }
     }
+
     if (has_dd_source)
         ddprocessor.CreateTempDirectory();
 
@@ -583,7 +921,7 @@ bool FillData::Run(SourceList &sourcelist)
         {
             LOG(VB_GENERAL, LOG_INFO, 
                 QString("Source %1 configured with no grabber. Nothing to do.")
-                    .arg((*it).id));
+                .arg((*it).id));
 
             externally_handled++;
             updateLastRunStart(query);
@@ -592,22 +930,23 @@ bool FillData::Run(SourceList &sourcelist)
         }
 
         LOG(VB_GENERAL, LOG_INFO, sidStr.arg((*it).id)
-                                  .arg((*it).name)
-                                  .arg(xmltv_grabber));
+            .arg((*it).name)
+            .arg(xmltv_grabber));
 
         query.prepare(
             "SELECT COUNT(chanid) FROM channel WHERE sourceid = "
-             ":SRCID AND xmltvid != ''");
+            ":SRCID AND xmltvid != ''");
         query.bindValue(":SRCID", (*it).id);
 
         if (query.exec() && query.next())
         {
             source_channels = query.value(0).toInt();
+
             if (source_channels > 0)
             {
                 LOG(VB_GENERAL, LOG_INFO,
                     QString("Found %1 channels for source %2 which use grabber")
-                        .arg(source_channels).arg((*it).id));
+                    .arg(source_channels).arg((*it).id));
             }
             else
             {
@@ -620,7 +959,7 @@ bool FillData::Run(SourceList &sourcelist)
             source_channels = 0;
             LOG(VB_GENERAL, LOG_INFO,
                 QString("Can't get a channel count for source id %1")
-                    .arg((*it).id));
+                .arg((*it).id));
         }
 
         bool hasprefmethod = false;
@@ -635,8 +974,8 @@ bool FillData::Run(SourceList &sourcelist)
             if (grabber_capabilities_proc.Wait() != GENERIC_EXIT_OK)
                 LOG(VB_GENERAL, LOG_ERR,
                     QString("%1  --capabilities failed or we timed out waiting."                            
-                    " You may need to upgrade your xmltv grabber")
-                        .arg(xmltv_grabber));
+                            " You may need to upgrade your xmltv grabber")
+                    .arg(xmltv_grabber));
             else
             {
                 QByteArray result = grabber_capabilities_proc.ReadAll();
@@ -645,7 +984,7 @@ bool FillData::Run(SourceList &sourcelist)
                 while (!ostream.atEnd())
                 {
                     QString capability
-                        = ostream.readLine().simplified();
+                    = ostream.readLine().simplified();
 
                     if (capability.isEmpty())
                         continue;
@@ -664,6 +1003,7 @@ bool FillData::Run(SourceList &sourcelist)
                     if (capability == "preferredmethod")
                         hasprefmethod = true;
                 }
+
                 LOG(VB_GENERAL, LOG_INFO,
                     QString("Grabber has capabilities: %1") .arg(capabilities));
             }
@@ -676,6 +1016,7 @@ bool FillData::Run(SourceList &sourcelist)
                                            QStringList("--preferredmethod"),
                                            flags);
             grabber_method_proc.Run(15);
+
             if (grabber_method_proc.Wait() != GENERIC_EXIT_OK)
                 LOG(VB_GENERAL, LOG_ERR,
                     QString("%1 --preferredmethod failed or we timed out "
@@ -685,10 +1026,10 @@ bool FillData::Run(SourceList &sourcelist)
             {
                 QTextStream ostream(grabber_method_proc.ReadAll());
                 (*it).xmltvgrabber_prefmethod =
-                                ostream.readLine().simplified();
+                    ostream.readLine().simplified();
 
                 LOG(VB_GENERAL, LOG_INFO, QString("Grabber prefers method: %1")
-                                    .arg((*it).xmltvgrabber_prefmethod));
+                    .arg((*it).xmltvgrabber_prefmethod));
             }
         }
 
@@ -719,13 +1060,14 @@ bool FillData::Run(SourceList &sourcelist)
             // We'll keep grabbing until it returns nothing
             // Max days currently supported is 21
             int grabdays = (is_grabber_datadirect(xmltv_grabber)) ?
-                14 : REFRESH_MAX;
+                           14 : REFRESH_MAX;
 
             grabdays = (maxDays > 0)          ? maxDays : grabdays;
             grabdays = (only_update_channels) ? 1       : grabdays;
 
             vector<bool> refresh_request;
             refresh_request.resize(grabdays, refresh_all);
+
             for (int i = 0; i < refresh_day.size(); i++)
                 refresh_request[i] = refresh_day[i];
 
@@ -747,12 +1089,14 @@ bool FillData::Run(SourceList &sourcelist)
                 {
                     QDate newDate = MythDate::current().date();
                     i += (newDate.daysTo(qCurrentDate));
+
                     if (i < 0)
                         i = 0;
+
                     qCurrentDate = newDate;
                 }
 
-                QString prevDate(qCurrentDate.addDays(i-1).toString());
+                QString prevDate(qCurrentDate.addDays(i - 1).toString());
                 QString currDate(qCurrentDate.addDays(i).toString());
 
                 LOG(VB_GENERAL, LOG_INFO, ""); // add a space between days
@@ -763,7 +1107,7 @@ bool FillData::Run(SourceList &sourcelist)
 
                 if (refresh_request[i])
                 {
-                    if ( i == 1 )
+                    if (i == 1)
                     {
                         LOG(VB_GENERAL, LOG_INFO,
                             "Data Refresh always needed for tomorrow");
@@ -773,6 +1117,7 @@ bool FillData::Run(SourceList &sourcelist)
                         LOG(VB_GENERAL, LOG_INFO,
                             "Data Refresh needed because of user request");
                     }
+
                     download_needed = true;
                 }
                 else
@@ -783,14 +1128,14 @@ bool FillData::Run(SourceList &sourcelist)
                                "FROM channel c "
                                "LEFT JOIN program p ON c.chanid = p.chanid "
                                "  AND starttime >= "
-                                   "DATE_ADD(DATE_ADD(CURRENT_DATE(), "
-                                   "INTERVAL '%1' DAY), INTERVAL '20' HOUR) "
+                               "DATE_ADD(DATE_ADD(CURRENT_DATE(), "
+                               "INTERVAL '%1' DAY), INTERVAL '20' HOUR) "
                                "  AND starttime < DATE_ADD(CURRENT_DATE(), "
-                                   "INTERVAL '%2' DAY) "
+                               "INTERVAL '%2' DAY) "
                                "WHERE c.sourceid = %3 AND c.xmltvid != '' "
                                "GROUP BY c.chanid;";
 
-                    if (query.exec(querystr.arg(i-1).arg(i).arg((*it).id)) &&
+                    if (query.exec(querystr.arg(i - 1).arg(i).arg((*it).id)) &&
                         query.isActive())
                     {
                         int prevChanCount = 0;
@@ -800,36 +1145,39 @@ bool FillData::Run(SourceList &sourcelist)
 
                         LOG(VB_CHANNEL, LOG_INFO,
                             QString("Checking program counts for day %1")
-                                .arg(i-1));
+                            .arg(i - 1));
 
                         while (query.next())
                         {
                             if (query.value(1).toInt() > 0)
                                 prevChanCount++;
+
                             previousDayCount += query.value(1).toInt();
 
                             LOG(VB_CHANNEL, LOG_INFO,
                                 QString("    chanid %1 -> %2 programs")
-                                    .arg(query.value(0).toString())
-                                    .arg(query.value(1).toInt()));
+                                .arg(query.value(0).toString())
+                                .arg(query.value(1).toInt()));
                         }
 
-                        if (query.exec(querystr.arg(i).arg(i+1).arg((*it).id))
-                                && query.isActive())
+                        if (query.exec(querystr.arg(i).arg(i + 1).arg((*it).id))
+                            && query.isActive())
                         {
                             LOG(VB_CHANNEL, LOG_INFO,
                                 QString("Checking program counts for day %1")
-                                    .arg(i));
+                                .arg(i));
+
                             while (query.next())
                             {
                                 if (query.value(1).toInt() > 0)
                                     currentChanCount++;
+
                                 currentDayCount += query.value(1).toInt();
 
                                 LOG(VB_CHANNEL, LOG_INFO,
                                     QString("    chanid %1 -> %2 programs")
-                                                .arg(query.value(0).toString())
-                                                .arg(query.value(1).toInt()));
+                                    .arg(query.value(0).toString())
+                                    .arg(query.value(1).toInt()));
                             }
                         }
                         else
@@ -850,8 +1198,8 @@ bool FillData::Run(SourceList &sourcelist)
                                         "from 8PM - midnight.  Previous day "
                                         "had %4 channels with data in that "
                                         "time period.")
-                                    .arg(currentChanCount).arg(source_channels)
-                                    .arg(i).arg(prevChanCount));
+                                .arg(currentChanCount).arg(source_channels)
+                                .arg(i).arg(prevChanCount));
                             download_needed = true;
                         }
                         else if (currentDayCount == 0)
@@ -870,7 +1218,7 @@ bool FillData::Run(SourceList &sourcelist)
                                         "midnight.  Unable to calculate how "
                                         "much we should have for the current "
                                         "day so a refresh is being forced.")
-                                    .arg(i-1));
+                                .arg(i - 1));
                             download_needed = true;
                         }
                         else if (currentDayCount < (currentChanCount * 3))
@@ -883,8 +1231,8 @@ bool FillData::Run(SourceList &sourcelist)
                                         "normally have data. "
                                         "We want at least %2 programs, but "
                                         "only found %3")
-                                    .arg(i).arg(currentChanCount * 3)
-                                    .arg(currentDayCount));
+                                .arg(i).arg(currentChanCount * 3)
+                                .arg(currentDayCount));
                             download_needed = true;
                         }
                         else if (currentDayCount < (previousDayCount / 2))
@@ -896,8 +1244,8 @@ bool FillData::Run(SourceList &sourcelist)
                                         "the 8PM - midnight time window. "
                                         "We want at least %2 programs, but "
                                         "only found %3").arg(i)
-                                    .arg(previousDayCount / 2)
-                                    .arg(currentDayCount));
+                                .arg(previousDayCount / 2)
+                                .arg(currentDayCount));
                             download_needed = true;
                         }
                     }
@@ -907,7 +1255,7 @@ bool FillData::Run(SourceList &sourcelist)
                             QString("Data Refresh needed because we are unable "
                                     "to query the data for day @ offset %1 to "
                                     "determine how much we should have for "
-                                    "offset day %2.").arg(i-1).arg(i));
+                                    "offset day %2.").arg(i - 1).arg(i));
                         download_needed = true;
                     }
                 }
@@ -916,9 +1264,11 @@ bool FillData::Run(SourceList &sourcelist)
                 {
                     LOG(VB_GENERAL, LOG_NOTICE,
                         QString("Refreshing data for ") + currDate);
+
                     if (!GrabData(*it, i, &qCurrentDate))
                     {
                         ++failures;
+
                         if (!fatalErrors.empty() || interrupted)
                         {
                             break;
@@ -940,6 +1290,7 @@ bool FillData::Run(SourceList &sourcelist)
                         ", skipping");
                 }
             }
+
             if (!fatalErrors.empty())
                 break;
         }
@@ -978,8 +1329,9 @@ bool FillData::Run(SourceList &sourcelist)
         for (int i = 0; i < fatalErrors.size(); i++)
         {
             LOG(VB_GENERAL, LOG_CRIT, LOC + "Encountered Fatal Error: " +
-                    fatalErrors[i]);
+                fatalErrors[i]);
         }
+
         return false;
     }
 
@@ -991,9 +1343,9 @@ bool FillData::Run(SourceList &sourcelist)
         if (nonewdata > 0 &&
             (total_sources != externally_handled))
             status = QString(QObject::tr(
-                     "mythfilldatabase ran, but did not insert "
-                     "any new data into the Guide for %1 of %2 sources. "
-                     "This can indicate a potential grabber failure."))
+                                 "mythfilldatabase ran, but did not insert "
+                                 "any new data into the Guide for %1 of %2 sources. "
+                                 "This can indicate a potential grabber failure."))
                      .arg(nonewdata)
                      .arg(total_sources);
         else
@@ -1011,10 +1363,12 @@ ChanInfo *FillData::xawtvChannel(QString &id, QString &channel, QString &fine)
     chaninfo->xmltvid = id;
     chaninfo->name = id;
     chaninfo->callsign = id;
+
     if (chan_data.channel_preset)
         chaninfo->chanstr = id;
     else
         chaninfo->chanstr = channel;
+
     chaninfo->finetune = fine;
     chaninfo->freqid = channel;
     chaninfo->tvformat = "Default";
@@ -1039,9 +1393,9 @@ void FillData::readXawtvChannels(int id, QString xawrcfile)
     string strLine;
     int nSplitPoint = 0;
 
-    while(!fin.eof())
+    while (!fin.eof())
     {
-        getline(fin,strLine);
+        getline(fin, strLine);
 
         if ((strLine[0] != '#') && (!strLine.empty()))
         {
@@ -1055,6 +1409,7 @@ void FillData::readXawtvChannels(int id, QString xawrcfile)
                         chanlist.push_back(*chinfo);
                         delete chinfo;
                     }
+
                     xawid = strLine.substr(1, nSplitPoint - 1).c_str();
                     channel.clear();
                     fine.clear();
@@ -1062,8 +1417,10 @@ void FillData::readXawtvChannels(int id, QString xawrcfile)
             }
             else if ((nSplitPoint = strLine.find('=') + 1) > 0)
             {
-                while (strLine.substr(nSplitPoint,1) == " ")
-                { ++nSplitPoint; }
+                while (strLine.substr(nSplitPoint, 1) == " ")
+                {
+                    ++nSplitPoint;
+                }
 
                 if (!strncmp(strLine.c_str(), "channel", 7))
                 {

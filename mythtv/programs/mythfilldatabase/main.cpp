@@ -72,6 +72,7 @@ int main(int argc, char *argv[])
     bool mark_repeats = true;
 
     bool usingDataDirect = false;
+    bool usingSchedulesDirect = false;
     bool grab_data = true;
 
     bool export_iconmap = false;
@@ -84,8 +85,10 @@ int main(int argc, char *argv[])
     bool update_icon_data = false;
 
     bool from_dd_file = false;
+    bool from_sd_file = false;
     int sourceid = -1;
     QString fromddfile_lineupid;
+    QString fromsdfile_lineupid;
 
     MythFillDatabaseCommandLineParser cmdline;
     if (!cmdline.Parse(argc, argv))
@@ -186,6 +189,25 @@ int main(int argc, char *argv[])
         LOG(VB_GENERAL, LOG_INFO,
             "Bypassing grabbers, reading directly from file");
         from_dd_file = true;
+    }
+
+    if (cmdline.toBool("sdfile"))
+    {
+        // schedulesdirect file mode
+        if (!cmdline.toBool("sourceid") ||
+            !cmdline.toBool("lineupid"))
+        {
+            cerr << "The --sd-file option must be used in combination" << endl
+                 << "with --sourceid and --lineupid" << endl;
+            return GENERIC_EXIT_INVALID_CMDLINE;
+        }
+
+        fromfile_id         = cmdline.toInt("sourceid");
+        fromddfile_lineupid = cmdline.toInt("lineupid");
+
+        LOG(VB_GENERAL, LOG_INFO,
+            "Bypassing grabbers, reading directly from file");
+        from_sd_file = true;
     }
 
     if (cmdline.toBool("xawchannels"))
@@ -422,6 +444,12 @@ int main(int argc, char *argv[])
         fill_data.GrabDataFromDDFile(
             fromfile_id, fromfile_offset, fromfile_name, fromddfile_lineupid);
     }
+    else if (from_sd_file)
+    {
+        fill_data.InsertSDDataintoDatabase(
+            fromfile_id, fromsdfile_lineupid);
+    }
+
     else
     {
         SourceList sourcelist;
@@ -465,6 +493,8 @@ int main(int argc, char *argv[])
                        sourcelist.push_back(newsource);
                        usingDataDirect |=
                            is_grabber_datadirect(newsource.xmltvgrabber);
+                       usingSchedulesDirect |=
+                           is_grabber_schedulesdirect(newsource.xmltvgrabber);
                   }
              }
              else

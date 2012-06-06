@@ -67,6 +67,12 @@ class FillData
     bool GrabData(Source source, int offset, QDate *qCurrentDate = 0);
     bool GrabDataFromDDFile(int id, int offset, const QString &filename,
                             const QString &lineupid, QDate *qCurrentDate = 0);
+
+    QString GetSDLoginRandhash(int);
+    bool DownloadSDFiles(QString&);
+    bool InsertSDDataintoDatabase(int id, const QString &lineupid);
+    bool is_SDHeadendVersionUpdated(int id, const QString &lineupid);
+
     bool Run(SourceList &sourcelist);
     ChanInfo *xawtvChannel(QString &id, QString &channel, QString &fine);
     void readXawtvChannels(int id, QString xawrcfile);

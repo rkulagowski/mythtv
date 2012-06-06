@@ -47,6 +47,12 @@ void MythFillDatabaseCommandLineParser::LoadArguments(void)
             "DataDirect download.")
         ->SetBlocks("xawchannels")
         ->SetRequires("sourceid");
+    add("--sd-file", "sdfile", false,
+            "Bypass grabber, and read SD data from file",
+            "Directly define the data needed to import a local "
+            "SchedulesDirect download.")
+        ->SetBlocks("xawchannels")
+        ->SetRequires("sourceid");
     add("--xawchannels", "xawchannels", false,
             "Read channels from xawtvrc file",
             "Import channels from an xawtvrc file.")
@@ -64,7 +70,9 @@ void MythFillDatabaseCommandLineParser::LoadArguments(void)
     add("--lineupid", "lineupid", 0, "DataDirect lineup of input xml file",
             "Specify the DataDirect lineup that corresponds to "
             "the information in the given XML file.")
-        ->SetRequiredChildOf("ddfile");
+        ->SetRequiredChildOf("ddfile")
+        ->SetRequiredChildOf("sdfile");
+
 
     add("--xmlfile", "xmlfile", "", "XML file to import manually",
             "Specify an XML guide data file to import directly "

@@ -13,8 +13,10 @@ INSTALLS = target
 
 QMAKE_CLEAN += $(TARGET)
 
-INCLUDEPATH += ../../libs/libmythtv/mpeg
+INCLUDEPATH += ../../libs/libmythtv/mpeg /usr/include/qjson
 DEPENDPATH  += ../../libs/libmythtv/mpeg
+LIBS += -lqjson
+
 
 # Input
 HEADERS += filldata.h   channeldata.h
