@@ -867,6 +867,8 @@ bool FillData::Run(SourceList &sourcelist)
 
         has_dd_source = true;
 
+qDebug() << "inside 1";
+
         for (it2 = sourcelist.begin(); it2 != sourcelist.end(); ++it2)
         {
             if (((*it).id           != (*it2).id)           &&
@@ -884,6 +886,9 @@ bool FillData::Run(SourceList &sourcelist)
 
     for (it = sourcelist.begin(); it != sourcelist.end(); ++it)
     {
+
+qDebug() << "inside 2";
+
         if (!fatalErrors.empty())
             break;
 
@@ -1034,6 +1039,14 @@ bool FillData::Run(SourceList &sourcelist)
         }
 
         need_post_grab_proc |= !is_grabber_datadirect(xmltv_grabber);
+
+if (xmltv_grabber == "schedulesdirect1")
+// Always grab all data with Schedules Direct
+{ 
+// dd_grab_all = true;
+qDebug() << "Grabber is schedulesdirect";
+
+}
 
         if (is_grabber_datadirect(xmltv_grabber) && dd_grab_all)
         {
