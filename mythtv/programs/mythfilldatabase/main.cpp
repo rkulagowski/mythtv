@@ -72,7 +72,6 @@ int main(int argc, char *argv[])
     bool mark_repeats = true;
 
     bool usingDataDirect = false;
-    bool usingSchedulesDirect = false;
     bool grab_data = true;
 
     bool export_iconmap = false;
@@ -493,8 +492,6 @@ int main(int argc, char *argv[])
                        sourcelist.push_back(newsource);
                        usingDataDirect |=
                            is_grabber_datadirect(newsource.xmltvgrabber);
-                       usingSchedulesDirect |=
-                           is_grabber_schedulesdirect(newsource.xmltvgrabber);
                   }
              }
              else
