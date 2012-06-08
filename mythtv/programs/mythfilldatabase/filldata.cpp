@@ -525,35 +525,90 @@ bool FillData::GrabDataFromDDFile(
     return GrabData(s, offset, currentd);
 }
 
-// Process for downloading Schedules Direct JSON data files.
-// Execute a login to http://rkulagow.schedulesdirect.org/login.php
-// Scan the downloaded file for the randhash.
-// Execute a "wget"
 
 // Schedules Direct login
 QString FillData::GetSDLoginRandhash(Source source)
 {
-QString randhash="dummyrandhash";
-
-//        QString url = "http://rkulagow.schedulesdirect.org/login.php";
-        QString url = "http://localhost/login.php";
-        QString destdir = "/tmp";
-//        QDir dir;
-      bool result = GetMythDownloadManager()->download(url, remoteThemesFile);
-
-
-//qDebug() << "username: " << source.userid << " password: " << source.password;
-
+    QString randhash="";
+    QString username, password;
+    username = source.userid;
+    password = source.password;
     
+    QString loginurl = "http://10.244.23.50/schedulesdirect/login.php";
 
+      LOG(VB_GENERAL, LOG_INFO, "Getting randhash from Schedules Direct");
+      MythDownloadManager *manager = GetMythDownloadManager();
+      
+      QByteArray tempdata, postdata;
+      tempdata += "username=";
+      tempdata += username;
+      tempdata += "&password=";
+      tempdata += password;
+      tempdata += "&submit=Log+In";
+      
+      postdata = tempdata.toPercentEncoding("&=+");
+      
+      QByteArray header = "Content-Type";
+      QByteArray value = "application/x-www-form-urlencoded";
+      
+    if (!manager->postAuth(loginurl, &postdata, NULL, NULL, &header, &value))
+    {
+// qDebug() << "Error with post";
+        return QString("error");
+    }
 
+    LOG(VB_GENERAL, LOG_INFO, QString("Downloaded %1 bytes")
+        .arg(postdata.size()));
 
-return randhash;
+    LOG(VB_GENERAL, LOG_INFO, "Uncompressing DataDirect feed");
+
+// Next part is just for debugging
+/*    QString randhashFile = QString("/tmp/sd_randhash");
+    QFile file(randhashFile);
+    file.open(QIODevice::WriteOnly);
+    file.write(postdata);
+    file.close();
+*/
+
+    QRegExp rx("randhash: ([a-z0-9]+)");
+    if (rx.indexIn(postdata) != -1) {
+     return rx.cap(1);
+    }
+    else
+    {
+     return "error";
+    }
+
 }
 
 // Schedules Direct download XMLID files.
-bool FillData::DownloadSDFiles(QString &randhash)
+bool FillData::DownloadSDFiles(QString randhash)
 {
+// Download all the unique XMLIDs
+QString xmltvid, url, destfile;
+//      MythDownloadManager *manager = GetMythDownloadManager();
+
+            MSqlQuery query(MSqlQuery::InitCon());
+            query.prepare(
+            "SELECT distinct(xmltvid) FROM channel"
+            );
+
+            if (!query.exec())
+            {
+                MythDB::DBError("FillData::grabData", query);
+                return false;
+            }
+
+            if (query.next())
+            // We're going to update all chanid's in the database that use this particular XMLID.
+            {
+              xmltvid = query.value(0).toString();
+qDebug() << "xmltvid is " << xmltvid;
+
+              url = "http://10.244.23.50/schedulesdirect/process.php?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
+              destfile = "/tmp/" + xmltvid + "_sched.txt.gz";
+              GetMythDownloadManager->download(url, destfile, false);
+            }
 
 return true;
 }
@@ -562,6 +617,9 @@ return true;
 // Schedules Direct check for lineup update
 bool FillData::is_SDHeadendVersionUpdated(int id, const QString &lineupid)
 {
+    QString url = "http://10.244.23.50/schedulesdirect/process.php?command=get&p1=lineup&p2=IL57303";
+
+
 return false;
 }
 
@@ -856,8 +914,6 @@ bool FillData::Run(SourceList &sourcelist)
 
         has_dd_source = true;
 
-qDebug() << "inside 1";
-
         for (it2 = sourcelist.begin(); it2 != sourcelist.end(); ++it2)
         {
             if (((*it).id           != (*it2).id)           &&
@@ -875,8 +931,6 @@ qDebug() << "inside 1";
 
     for (it = sourcelist.begin(); it != sourcelist.end(); ++it)
     {
-
-qDebug() << "inside 2";
 
         if (!fatalErrors.empty())
             break;
@@ -1031,15 +1085,31 @@ qDebug() << "inside 2";
 
         if (xmltv_grabber == "schedulesdirect1")
         { // All the magic happens here.
-
-qDebug() << "Getting randhash.";
         /*
-        * Login to the site and get the randhash.
-        * Execute
+        * Process for downloading Schedules Direct JSON data files.
+        * Execute a login to http://rkulagow.schedulesdirect.org/login.php
+        * Scan the downloaded file for the randhash.
+        * Download status messages
+        * 
         */
-        QString randhash = GetSDLoginRandhash(*it);
-qDebug() << "randhash is " << randhash;
-        }
+          QString randhash = GetSDLoginRandhash(*it);
+//qDebug() << "randhash is " << randhash;
+          if (randhash == "error")
+          {
+            qDebug() << "Error getting randhash.";
+            exit;
+          }
+          
+          if(!DownloadSDFiles(randhash))
+          {
+          qDebug() << "Error downloading files.";
+          }
+
+          
+
+
+        
+        } // Done with the schedulesdirect stuff.
 
         if (is_grabber_datadirect(xmltv_grabber) && dd_grab_all)
         {

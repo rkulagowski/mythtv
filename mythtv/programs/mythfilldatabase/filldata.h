@@ -69,7 +69,7 @@ class FillData
                             const QString &lineupid, QDate *qCurrentDate = 0);
 
     QString GetSDLoginRandhash(Source source);
-    bool DownloadSDFiles(QString&);
+    bool DownloadSDFiles(QString randhash);
     bool InsertSDDataintoDatabase(int id, const QString &lineupid);
     bool is_SDHeadendVersionUpdated(int id, const QString &lineupid);
 
