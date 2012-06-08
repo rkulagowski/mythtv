@@ -68,7 +68,7 @@ class FillData
     bool GrabDataFromDDFile(int id, int offset, const QString &filename,
                             const QString &lineupid, QDate *qCurrentDate = 0);
 
-    QString GetSDLoginRandhash(int);
+    QString GetSDLoginRandhash(Source source);
     bool DownloadSDFiles(QString&);
     bool InsertSDDataintoDatabase(int id, const QString &lineupid);
     bool is_SDHeadendVersionUpdated(int id, const QString &lineupid);

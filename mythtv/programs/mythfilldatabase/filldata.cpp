@@ -531,33 +531,22 @@ bool FillData::GrabDataFromDDFile(
 // Execute a "wget"
 
 // Schedules Direct login
-QString FillData::GetSDLoginRandhash(int sourceid)
+QString FillData::GetSDLoginRandhash(Source source)
 {
-QString randhash="";
-QString username, password;
+QString randhash="dummyrandhash";
 
-        QString url = "http://rkulagow.schedulesdirect.org/login.php";
+//        QString url = "http://rkulagow.schedulesdirect.org/login.php";
+        QString url = "http://localhost/login.php";
         QString destdir = "/tmp";
 //        QDir dir;
-            MSqlQuery query(MSqlQuery::InitCon());
-            query.prepare(
-            "SELECT userid, password from FROM videosource WHERE sourceid = :SOURCEID"
-            );
+      bool result = GetMythDownloadManager()->download(url, remoteThemesFile);
 
-            query.bindValue(":SOURCEID", sourceid);
-            if (!query.exec())
-            {
-                MythDB::DBError("FillData::grabData", query);
-                return false;
-            }
 
-            if (query.next())
-            {
-              username = query.value(0).toString();
-              password = query.value(1).toString();
-            }
-//        bool result = GetMythDownloadManager()->download(url, remoteThemesFile);
-qDebug() << "username: " << username << " password: " << password;
+//qDebug() << "username: " << source.userid << " password: " << source.password;
+
+    
+
+
 
 return randhash;
 }
@@ -1040,13 +1029,17 @@ qDebug() << "inside 2";
 
         need_post_grab_proc |= !is_grabber_datadirect(xmltv_grabber);
 
-if (xmltv_grabber == "schedulesdirect1")
-// Always grab all data with Schedules Direct
-{ 
-// dd_grab_all = true;
-qDebug() << "Grabber is schedulesdirect";
+        if (xmltv_grabber == "schedulesdirect1")
+        { // All the magic happens here.
 
-}
+qDebug() << "Getting randhash.";
+        /*
+        * Login to the site and get the randhash.
+        * Execute
+        */
+        QString randhash = GetSDLoginRandhash(*it);
+qDebug() << "randhash is " << randhash;
+        }
 
         if (is_grabber_datadirect(xmltv_grabber) && dd_grab_all)
         {
