@@ -43,7 +43,7 @@ class MythDownloadInfo
 {
   public:
     MythDownloadInfo() :
-        m_request(NULL),         m_reply(NULL),       m_data(NULL),
+        m_request(NULL),         m_reply(NULL),        m_data(NULL),
         m_caller(NULL),          m_requestType(kRequestGet),
         m_reload(false),         m_preferCache(false), m_syncMode(false),
         m_processReply(true),    m_done(false),        m_bytesReceived(0),
