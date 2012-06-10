@@ -534,7 +534,8 @@ QString FillData::GetSDLoginRandhash(Source source)
     username = source.userid;
     password = source.password;
     
-    QString loginurl = "http://10.244.23.50/schedulesdirect/login.php";
+//    QString loginurl = "http://10.244.23.50/schedulesdirect/login.php";
+    QString loginurl = "http://rkulagow.schedulesdirect.org/schedulesdirect/login.php";
 
       LOG(VB_GENERAL, LOG_INFO, "Getting randhash from Schedules Direct");
       MythDownloadManager *manager = GetMythDownloadManager();
@@ -588,6 +589,9 @@ bool FillData::DownloadSDFiles(QString randhash)
 QString xmltvid, url, destfile;
 //      MythDownloadManager *manager = GetMythDownloadManager();
 
+QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
+//QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
+
             MSqlQuery query(MSqlQuery::InitCon());
             query.prepare(
             "SELECT distinct(xmltvid) FROM channel"
@@ -605,7 +609,7 @@ QString xmltvid, url, destfile;
               xmltvid = query.value(0).toString();
 qDebug() << "xmltvid is " << xmltvid;
 
-              url = "http://10.244.23.50/schedulesdirect/process.php?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
+              url = urlbase + "?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
               destfile = "/tmp/" + xmltvid + "_sched.txt.gz";
               GetMythDownloadManager()->download(url, destfile, false);
             }
@@ -617,7 +621,10 @@ return true;
 // Schedules Direct check for lineup update
 bool FillData::is_SDHeadendVersionUpdated(int id, const QString &lineupid)
 {
-    QString url = "http://10.244.23.50/schedulesdirect/process.php?command=get&p1=lineup&p2=IL57303";
+QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
+// QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
+
+    QString url = urlbase + "?command=get&p1=lineup&p2=IL57303";
 
 
 return false;
