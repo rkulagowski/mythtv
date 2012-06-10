@@ -607,7 +607,7 @@ qDebug() << "xmltvid is " << xmltvid;
 
               url = "http://10.244.23.50/schedulesdirect/process.php?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
               destfile = "/tmp/" + xmltvid + "_sched.txt.gz";
-              GetMythDownloadManager->download(url, destfile, false);
+              GetMythDownloadManager()->download(url, destfile, false);
             }
 
 return true;
