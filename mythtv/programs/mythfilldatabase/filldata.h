@@ -27,6 +27,7 @@ bool updateLastRunStatus(MSqlQuery &query, QString &status);
 struct Source
 {
     Source() : id(0), name(), xmltvgrabber(), userid(), password(), lineupid(),
+        version(0), modified(),
         xmltvgrabber_baseline(false), xmltvgrabber_manualconfig(false),
         xmltvgrabber_cache(false), xmltvgrabber_prefmethod() {}
     int id;
@@ -35,6 +36,8 @@ struct Source
     QString userid;
     QString password;
     QString lineupid;
+    int version;
+    QString modified;
     bool    xmltvgrabber_baseline;
     bool    xmltvgrabber_manualconfig;
     bool    xmltvgrabber_cache;
@@ -71,7 +74,7 @@ class FillData
     QString GetSDLoginRandhash(Source source);
     bool DownloadSDFiles(QString randhash);
     bool InsertSDDataintoDatabase(int id, const QString &lineupid);
-    bool is_SDHeadendVersionUpdated(int id, const QString &lineupid);
+    bool is_SDHeadendVersionUpdated(Source source);
 
     bool Run(SourceList &sourcelist);
     ChanInfo *xawtvChannel(QString &id, QString &channel, QString &fine);
