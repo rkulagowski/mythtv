@@ -554,14 +554,11 @@ QString FillData::GetSDLoginRandhash(Source source)
       
     if (!manager->postAuth(loginurl, &postdata, NULL, NULL, &header, &value))
     {
-// qDebug() << "Error with post";
+     LOG(VB_GENERAL, LOG_INFO, QString("Could not post auth credentials to Schedules Direct."));
         return QString("error");
     }
 
-    LOG(VB_GENERAL, LOG_INFO, QString("Downloaded %1 bytes")
-        .arg(postdata.size()));
-
-    LOG(VB_GENERAL, LOG_INFO, "Uncompressing DataDirect feed");
+//    LOG(VB_GENERAL, LOG_INFO, "Uncompressing SchedulesDirect feed");
 
 // Next part is just for debugging
 /*    QString randhashFile = QString("/tmp/sd_randhash");
@@ -573,10 +570,13 @@ QString FillData::GetSDLoginRandhash(Source source)
 
     QRegExp rx("randhash: ([a-z0-9]+)");
     if (rx.indexIn(postdata) != -1) {
-     return rx.cap(1);
+     randhash = rx.cap(1);
+     LOG(VB_GENERAL, LOG_INFO, QString("randhash is %1").arg(randhash));
+     return randhash;
     }
     else
     {
+     LOG(VB_GENERAL, LOG_INFO, QString("Could not decode randhash."));
      return "error";
     }
 
@@ -587,7 +587,6 @@ bool FillData::DownloadSDFiles(QString randhash)
 {
 // Download all the unique XMLIDs
 QString xmltvid, url, destfile;
-//      MythDownloadManager *manager = GetMythDownloadManager();
 
 //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
 QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
@@ -607,8 +606,6 @@ QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
             // We're going to update all chanid's in the database that use this particular XMLID.
             {
               xmltvid = query.value(0).toString();
-qDebug() << "xmltvid is " << xmltvid;
-
               url = urlbase + "?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
               destfile = "/tmp/" + xmltvid + "_sched.txt.gz";
               GetMythDownloadManager()->download(url, destfile, false);
@@ -619,14 +616,19 @@ return true;
 
 
 // Schedules Direct check for lineup update
-bool FillData::is_SDHeadendVersionUpdated(int id, const QString &lineupid)
+bool FillData::is_SDHeadendVersionUpdated(Source source)
 {
 //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
  QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
+ QString lineup = source.lineupid;
+ QString destfile;
 
-    QString url = urlbase + "?command=get&p1=lineup&p2=IL57303";
+qDebug() << "lineup is " << lineup;
 
-
+    QString url = urlbase + "?command=get&p1=lineup&p2=" + lineup;
+              destfile = "/tmp/" + lineup + ".txt";
+              GetMythDownloadManager()->download(url, destfile, false);
+    
 return false;
 }
 
@@ -1090,13 +1092,16 @@ bool FillData::Run(SourceList &sourcelist)
 
         need_post_grab_proc |= !is_grabber_datadirect(xmltv_grabber);
 
-        if (xmltv_grabber == "schedulesdirect1")
-        { // All the magic happens here.
+        if (xmltv_grabber == "schedulesdirect2")
+        { 
         /*
+        * The "schedulesdirect1" grabber is for the internal grabber to TMS
+        * so we use schedulesdirect2 to differentiate.
         * Process for downloading Schedules Direct JSON data files.
         * Execute a login to http://rkulagow.schedulesdirect.org/login.php
         * Scan the downloaded file for the randhash.
         * Download status messages
+        * Check the version number of the headend
         * 
         */
           QString randhash = GetSDLoginRandhash(*it);
@@ -1106,15 +1111,17 @@ bool FillData::Run(SourceList &sourcelist)
             qDebug() << "Error getting randhash.";
             exit;
           }
+
+          if(is_SDHeadendVersionUpdated(*it))
+          {
+qDebug() << "Headend updated. Do something here; write a message to the log.";
+          }
+
           
           if(!DownloadSDFiles(randhash))
           {
           qDebug() << "Error downloading files.";
           }
-
-          
-
-
         
         } // Done with the schedulesdirect stuff.
 
@@ -1379,10 +1386,13 @@ bool FillData::Run(SourceList &sourcelist)
         }
         else
         {
+            if (xmltv_grabber != "schedulesdirect2")
+            { // only print an error if we're not using schedulesdirect2
             LOG(VB_GENERAL, LOG_ERR,
                 QString("Grabbing XMLTV data using ") + xmltv_grabber +
                 " is not supported. You may need to upgrade to"
                 " the latest version of XMLTV.");
+            }
         }
 
         if (interrupted)
