@@ -42,10 +42,10 @@ namespace
 
     class CleanupGuard
     {
-      public:
+    public:
         typedef void (*CleanupFunc)();
 
-      public:
+    public:
         CleanupGuard(CleanupFunc cleanFunction) :
             m_cleanFunction(cleanFunction) {}
 
@@ -54,7 +54,7 @@ namespace
             m_cleanFunction();
         }
 
-      private:
+    private:
         CleanupFunc m_cleanFunction;
     };
 }
@@ -90,6 +90,7 @@ int main(int argc, char *argv[])
     QString fromsdfile_lineupid;
 
     MythFillDatabaseCommandLineParser cmdline;
+
     if (!cmdline.Parse(argc, argv))
     {
         cmdline.PrintHelp();
@@ -114,6 +115,7 @@ int main(int argc, char *argv[])
     myth_nice(19);
 
     int retval;
+
     if ((retval = cmdline.ConfigureLogging()) != GENERIC_EXIT_OK)
         return retval;
 
@@ -134,6 +136,7 @@ int main(int argc, char *argv[])
                  << endl;
             return GENERIC_EXIT_INVALID_CMDLINE;
         }
+
         fill_data.chan_data.non_us_updating = true;
     }
 
@@ -169,7 +172,7 @@ int main(int argc, char *argv[])
     if (cmdline.toBool("ddfile"))
     {
         // datadirect file mode
-        if (!cmdline.toBool("sourceid") || 
+        if (!cmdline.toBool("sourceid") ||
             !cmdline.toBool("offset") ||
             !cmdline.toBool("lineupid") ||
             !cmdline.toBool("xmlfile"))
@@ -229,14 +232,19 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("dochannelupdates"))
         fill_data.chan_data.channel_updates = true;
+
     if (cmdline.toBool("removechannels"))
         fill_data.chan_data.remove_new_channels = true;
+
     if (cmdline.toBool("nofilterchannels"))
         fill_data.chan_data.filter_new_channels = false;
+
     if (!cmdline.GetPassthrough().isEmpty())
         fill_data.graboptions = " " + cmdline.GetPassthrough();
+
     if (cmdline.toBool("sourceid"))
         sourceid = cmdline.toInt("sourceid");
+
     if (cmdline.toBool("cardtype"))
     {
         if (!cmdline.toBool("sourceid"))
@@ -247,40 +255,48 @@ int main(int argc, char *argv[])
         }
 
         fill_data.chan_data.cardtype = cmdline.toString("cardtype")
-                                                .trimmed().toUpper();
+                                       .trimmed().toUpper();
     }
+
     if (cmdline.toBool("maxdays") && cmdline.toInt("maxdays") > 0)
     {
         fill_data.maxDays = cmdline.toInt("maxdays");
+
         if (fill_data.maxDays == 1)
             fill_data.SetRefresh(0, true);
     }
 
     if (cmdline.toBool("refreshtoday"))
         cmdline.SetValue("refresh",
-                cmdline.toStringList("refresh") << "today");
+                         cmdline.toStringList("refresh") << "today");
+
     if (cmdline.toBool("dontrefreshtomorrow"))
-        cmdline.SetValue("refresh", 
-                cmdline.toStringList("refresh") << "nottomorrow");
+        cmdline.SetValue("refresh",
+                         cmdline.toStringList("refresh") << "nottomorrow");
+
     if (cmdline.toBool("refreshsecond"))
-        cmdline.SetValue("refresh", 
-                cmdline.toStringList("refresh") << "second");
+        cmdline.SetValue("refresh",
+                         cmdline.toStringList("refresh") << "second");
+
     if (cmdline.toBool("refreshall"))
-        cmdline.SetValue("refresh", 
-                cmdline.toStringList("refresh") << "all");
+        cmdline.SetValue("refresh",
+                         cmdline.toStringList("refresh") << "all");
+
     if (cmdline.toBool("refreshday"))
         cmdline.SetValue("refresh",
-                cmdline.toStringList("refresh") << 
-                                        cmdline.toStringList("refreshday"));
+                         cmdline.toStringList("refresh") <<
+                         cmdline.toStringList("refreshday"));
 
     QStringList sl = cmdline.toStringList("refresh");
+
     if (!sl.isEmpty())
     {
         QStringList::const_iterator i = sl.constBegin();
+
         for (; i != sl.constEnd(); ++i)
         {
             QString warn = QString("Invalid entry in --refresh list: %1")
-                                .arg(*i);
+                           .arg(*i);
 
             bool enable = (*i).contains("not") ? false : true;
 
@@ -298,6 +314,7 @@ int main(int argc, char *argv[])
                 QStringList r = (*i).split("-");
 
                 uint lower = r[0].toUInt(&ok);
+
                 if (!ok)
                 {
                     cerr << warn.toLocal8Bit().constData() << endl;
@@ -305,6 +322,7 @@ int main(int argc, char *argv[])
                 }
 
                 uint upper = r[1].toUInt(&ok);
+
                 if (!ok)
                 {
                     cerr << warn.toLocal8Bit().constData() << endl;
@@ -324,6 +342,7 @@ int main(int argc, char *argv[])
             {
                 bool ok;
                 uint day = (*i).toUInt(&ok);
+
                 if (!ok)
                 {
                     cerr << warn.toLocal8Bit().constData() << endl;
@@ -337,28 +356,35 @@ int main(int argc, char *argv[])
 
     if (cmdline.toBool("dontrefreshtba"))
         fill_data.refresh_tba = false;
+
     if (cmdline.toBool("ddgraball"))
     {
         fill_data.SetRefresh(FillData::kRefreshClear, false);
         fill_data.dd_grab_all = true;
     }
+
     if (cmdline.toBool("onlychannels"))
         fill_data.only_update_channels = true;
 
     mark_repeats = cmdline.toBool("markrepeats");
+
     if (cmdline.toBool("exporticonmap"))
         export_icon_data_filename = cmdline.toString("exporticonmap");
+
     if (cmdline.toBool("importiconmap"))
         import_icon_data_filename = cmdline.toString("importiconmap");
+
     if (cmdline.toBool("updateiconmap"))
     {
         update_icon_data = true;
         grab_data = false;
     }
+
     if (cmdline.toBool("reseticonmap"))
     {
         reset_iconmap = true;
         grab_data = false;
+
         if (cmdline.toString("reseticonmap") == "all")
             reset_iconmap_icons = true;
     }
@@ -366,6 +392,7 @@ int main(int argc, char *argv[])
     CleanupGuard callCleanup(cleanup);
 
     gContext = new MythContext(MYTH_BINARY_VERSION);
+
     if (!gContext->Init(false))
     {
         LOG(VB_GENERAL, LOG_ERR, "Failed to init MythContext, exiting.");
@@ -431,8 +458,8 @@ int main(int argc, char *argv[])
 
         if (GuideDataAfter == GuideDataBefore)
             status = QObject::tr("mythfilldatabase ran, but did not insert "
-                    "any new data into the Guide.  This can indicate a "
-                    "potential problem with the XML file used for the update.");
+                                 "any new data into the Guide.  This can indicate a "
+                                 "potential problem with the XML file used for the update.");
         else
             status = QObject::tr("Successful.");
 
@@ -467,47 +494,47 @@ int main(int argc, char *argv[])
         QString querystr = QString("SELECT sourceid,name,xmltvgrabber,userid,"
                                    "password,lineupid,version,modified "
                                    "FROM videosource ") + where +
-                                   QString(" ORDER BY sourceid;");
+                           QString(" ORDER BY sourceid;");
 
         if (sourcequery.exec(querystr))
         {
-             if (sourcequery.size() > 0)
-             {
-                  while (sourcequery.next())
-                  {
-                       Source newsource;
+            if (sourcequery.size() > 0)
+            {
+                while (sourcequery.next())
+                {
+                    Source newsource;
 
-                       newsource.id = sourcequery.value(0).toInt();
-                       newsource.name = sourcequery.value(1).toString();
-                       newsource.xmltvgrabber = sourcequery.value(2).toString();
-                       newsource.userid = sourcequery.value(3).toString();
-                       newsource.password = sourcequery.value(4).toString();
-                       newsource.lineupid = sourcequery.value(5).toString();
-                       newsource.version = sourcequery.value(6).toInt();
-                       newsource.modified = sourcequery.value(7).toString();
+                    newsource.id = sourcequery.value(0).toInt();
+                    newsource.name = sourcequery.value(1).toString();
+                    newsource.xmltvgrabber = sourcequery.value(2).toString();
+                    newsource.userid = sourcequery.value(3).toString();
+                    newsource.password = sourcequery.value(4).toString();
+                    newsource.lineupid = sourcequery.value(5).toString();
+                    newsource.version = sourcequery.value(6).toInt();
+                    newsource.modified = sourcequery.value(7).toString();
 
-                       newsource.xmltvgrabber_baseline = false;
-                       newsource.xmltvgrabber_manualconfig = false;
-                       newsource.xmltvgrabber_cache = false;
-                       newsource.xmltvgrabber_prefmethod = "";
+                    newsource.xmltvgrabber_baseline = false;
+                    newsource.xmltvgrabber_manualconfig = false;
+                    newsource.xmltvgrabber_cache = false;
+                    newsource.xmltvgrabber_prefmethod = "";
 
-                       sourcelist.push_back(newsource);
-                       usingDataDirect |=
-                           is_grabber_datadirect(newsource.xmltvgrabber);
-                  }
-             }
-             else
-             {
-                  LOG(VB_GENERAL, LOG_ERR,
-                      "There are no channel sources defined, did you run "
-                      "the setup program?");
-                  return GENERIC_EXIT_SETUP_ERROR;
-             }
+                    sourcelist.push_back(newsource);
+                    usingDataDirect |=
+                        is_grabber_datadirect(newsource.xmltvgrabber);
+                }
+            }
+            else
+            {
+                LOG(VB_GENERAL, LOG_ERR,
+                    "There are no channel sources defined, did you run "
+                    "the setup program?");
+                return GENERIC_EXIT_SETUP_ERROR;
+            }
         }
         else
         {
-             MythDB::DBError("loading channel sources", sourcequery);
-             return GENERIC_EXIT_DB_ERROR;
+            MythDB::DBError("loading channel sources", sourcequery);
+            return GENERIC_EXIT_DB_ERROR;
         }
 
         if (!fill_data.Run(sourcelist))
@@ -540,6 +567,7 @@ int main(int argc, char *argv[])
     {
         MSqlQuery query(MSqlQuery::InitCon());
         query.prepare("SELECT sourceid FROM videosource ORDER BY sourceid");
+
         if (!query.exec())
         {
             MythDB::DBError("Querying sources", query);
@@ -554,6 +582,7 @@ int main(int argc, char *argv[])
     {
         LOG(VB_GENERAL, LOG_INFO, "Adjusting program database end times.");
         int update_count = ProgramData::fix_end_times();
+
         if (update_count == -1)
             LOG(VB_GENERAL, LOG_ERR, "fix_end_times failed!");
         else
@@ -567,9 +596,9 @@ int main(int argc, char *argv[])
 
         MSqlQuery query(MSqlQuery::InitCon());
         query.prepare("UPDATE program SET generic = 1 WHERE "
-            "((programid = '' AND subtitle = '' AND description = '') OR "
-            " (programid <> '' AND category_type = 'series' AND "
-            "  program.programid LIKE '%0000'));");
+                      "((programid = '' AND subtitle = '' AND description = '') OR "
+                      " (programid <> '' AND category_type = 'series' AND "
+                      "  program.programid LIKE '%0000'));");
 
         if (!query.exec())
             MythDB::DBError("mark generic", query);
@@ -581,13 +610,14 @@ int main(int argc, char *argv[])
     if (grab_data)
     {
         LOG(VB_GENERAL, LOG_INFO, "Extending non-unique programids "
-                                  "with multiple parts.");
+            "with multiple parts.");
 
         int found = 0;
         MSqlQuery sel(MSqlQuery::InitCon());
         sel.prepare("SELECT DISTINCT programid, partnumber, parttotal "
                     "FROM program WHERE partnumber > 0 AND parttotal > 0 AND "
                     "programid LIKE '%0000'");
+
         if (sel.exec())
         {
             MSqlQuery repl(MSqlQuery::InitCon());
@@ -613,19 +643,20 @@ int main(int argc, char *argv[])
 
                 LOG(VB_GENERAL, LOG_INFO,
                     QString("    %1 -> %2 (part %3 of %4)")
-                        .arg(orig_programid).arg(new_programid)
-                        .arg(partnum).arg(parttotal));
+                    .arg(orig_programid).arg(new_programid)
+                    .arg(partnum).arg(parttotal));
 
                 repl.bindValue(":NEWID", new_programid);
                 repl.bindValue(":OLDID", orig_programid);
                 repl.bindValue(":PARTNUM",   partnum);
                 repl.bindValue(":PARTTOTAL", parttotal);
+
                 if (!repl.exec())
                 {
                     LOG(VB_GENERAL, LOG_INFO,
                         QString("Fudging programid from '%1' to '%2'")
-                            .arg(orig_programid)
-                            .arg(new_programid));
+                        .arg(orig_programid)
+                        .arg(new_programid));
                 }
                 else
                     found += repl.numRowsAffected();
@@ -639,7 +670,7 @@ int main(int argc, char *argv[])
     {
         LOG(VB_GENERAL, LOG_INFO, "Marking repeats.");
 
-        int newEpiWindow = gCoreContext->GetNumSetting( "NewEpisodeWindow", 14);
+        int newEpiWindow = gCoreContext->GetNumSetting("NewEpisodeWindow", 14);
 
         MSqlQuery query(MSqlQuery::InitCon());
         query.prepare("UPDATE program SET previouslyshown = 1 "
@@ -672,6 +703,7 @@ int main(int argc, char *argv[])
     {
         MSqlQuery updt(MSqlQuery::InitCon());
         updt.prepare("UPDATE program SET first = 0, last = 0;");
+
         if (!updt.exec())
             MythDB::DBError("Clearing first and last showings", updt);
 
@@ -685,25 +717,29 @@ int main(int argc, char *argv[])
                      "ON program.programid = firsts.programid "
                      "  AND program.starttime = firsts.starttime "
                      "SET program.first=1;");
+
         if (!updt.exec())
             MythDB::DBError("Marking first showings by id", updt);
+
         int found = updt.numRowsAffected();
 
         updt.prepare("UPDATE program "
-                      "JOIN (SELECT MIN(starttime) AS starttime, title, subtitle,"
-                      "           LEFT(description, 1024) AS partdesc "
-                      "      FROM program "
-                      "      WHERE programid = '' "
-                      "      GROUP BY title, subtitle, partdesc "
-                      "     ) AS firsts "
-                      "ON program.starttime = firsts.starttime "
-                      "  AND program.title = firsts.title "
-                      "  AND program.subtitle = firsts.subtitle "
-                      "  AND LEFT(program.description, 1024) = firsts.partdesc "
-                      "SET program.first = 1 "
-                      "WHERE program.programid = '';");
+                     "JOIN (SELECT MIN(starttime) AS starttime, title, subtitle,"
+                     "           LEFT(description, 1024) AS partdesc "
+                     "      FROM program "
+                     "      WHERE programid = '' "
+                     "      GROUP BY title, subtitle, partdesc "
+                     "     ) AS firsts "
+                     "ON program.starttime = firsts.starttime "
+                     "  AND program.title = firsts.title "
+                     "  AND program.subtitle = firsts.subtitle "
+                     "  AND LEFT(program.description, 1024) = firsts.partdesc "
+                     "SET program.first = 1 "
+                     "WHERE program.programid = '';");
+
         if (!updt.exec())
             MythDB::DBError("Marking first showings", updt);
+
         found += updt.numRowsAffected();
         LOG(VB_GENERAL, LOG_INFO, QString("    Found %1").arg(found));
 
@@ -717,25 +753,29 @@ int main(int argc, char *argv[])
                      "ON program.programid = lasts.programid "
                      "  AND program.starttime = lasts.starttime "
                      "SET program.last=1;");
+
         if (!updt.exec())
             MythDB::DBError("Marking last showings by id", updt);
+
         found = updt.numRowsAffected();
 
         updt.prepare("UPDATE program "
-                      "JOIN (SELECT MAX(starttime) AS starttime, title, subtitle,"
-                      "           LEFT(description, 1024) AS partdesc "
-                      "      FROM program "
-                      "      WHERE programid = '' "
-                      "      GROUP BY title, subtitle, partdesc "
-                      "     ) AS lasts "
-                      "ON program.starttime = lasts.starttime "
-                      "  AND program.title = lasts.title "
-                      "  AND program.subtitle = lasts.subtitle "
-                      "  AND LEFT(program.description, 1024) = lasts.partdesc "
-                      "SET program.last = 1 "
-                      "WHERE program.programid = '';");
+                     "JOIN (SELECT MAX(starttime) AS starttime, title, subtitle,"
+                     "           LEFT(description, 1024) AS partdesc "
+                     "      FROM program "
+                     "      WHERE programid = '' "
+                     "      GROUP BY title, subtitle, partdesc "
+                     "     ) AS lasts "
+                     "ON program.starttime = lasts.starttime "
+                     "  AND program.title = lasts.title "
+                     "  AND program.subtitle = lasts.subtitle "
+                     "  AND LEFT(program.description, 1024) = lasts.partdesc "
+                     "SET program.last = 1 "
+                     "WHERE program.programid = '';");
+
         if (!updt.exec())
             MythDB::DBError("Marking last showings", updt);
+
         found += updt.numRowsAffected();
         LOG(VB_GENERAL, LOG_INFO, QString("    Found %1").arg(found));
     }
@@ -745,6 +785,7 @@ int main(int argc, char *argv[])
         MSqlQuery query(MSqlQuery::InitCon());
         query.prepare("SELECT count(previouslyshown) "
                       "FROM program WHERE previouslyshown = 1;");
+
         if (query.exec() && query.next())
         {
             if (query.value(0).toInt() != 0)
@@ -761,11 +802,11 @@ int main(int argc, char *argv[])
     }
 
     LOG(VB_GENERAL, LOG_INFO, "\n"
-            "===============================================================\n"
-            "| Attempting to contact the master backend for rescheduling.  |\n"
-            "| If the master is not running, rescheduling will happen when |\n"
-            "| the master backend is restarted.                            |\n"
-            "===============================================================");
+        "===============================================================\n"
+        "| Attempting to contact the master backend for rescheduling.  |\n"
+        "| If the master is not running, rescheduling will happen when |\n"
+        "| the master backend is restarted.                            |\n"
+        "===============================================================");
 
     if (grab_data || mark_repeats)
         ScheduledRecording::RescheduleMatch(0, 0, 0, QDateTime(),

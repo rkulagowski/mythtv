@@ -37,6 +37,9 @@ using namespace std;
 // filldata headers
 #include "filldata.h"
 
+// fillutil header
+#include "fillutil.h" // for uncompress routine
+
 #define LOC QString("FillData: ")
 #define LOC_WARN QString("FillData, Warning: ")
 #define LOC_ERR QString("FillData, Error: ")
@@ -257,7 +260,7 @@ bool FillData::GrabDDData(Source source, int poffset,
         else
         {
             QDateTime fromdatetime =
-                QDateTime(pdate, QTime(0,0), Qt::UTC).addDays(poffset);
+                QDateTime(pdate, QTime(0, 0), Qt::UTC).addDays(poffset);
             QDateTime todatetime = fromdatetime.addDays(1);
 
             LOG(VB_GENERAL, LOG_INFO, QString("Grabbing data for %1 offset %2")
@@ -309,6 +312,7 @@ bool FillData::GrabDDData(Source source, int poffset,
 #endif
 
     query.prepare("SELECT count(*) from dd_v_program;");
+
     if (query.exec() && query.next())
     {
         if (query.value(0).toInt() < 1)
@@ -511,6 +515,7 @@ bool FillData::GrabDataFromDDFile(
 {
     QDate *currentd = qCurrentDate;
     QDate qcd = MythDate::current().date();
+
     if (!currentd)
         currentd = &qcd;
 
@@ -529,55 +534,57 @@ bool FillData::GrabDataFromDDFile(
 // Schedules Direct login
 QString FillData::GetSDLoginRandhash(Source source)
 {
-    QString randhash="";
+    QString randhash = "";
     QString username, password;
     username = source.userid;
     password = source.password;
-    
-    QString loginurl = "http://10.244.23.50/schedulesdirect/login.php";
-//    QString loginurl = "http://rkulagow.schedulesdirect.org/schedulesdirect/login.php";
 
-      LOG(VB_GENERAL, LOG_INFO, "Getting randhash from Schedules Direct");
-      MythDownloadManager *manager = GetMythDownloadManager();
-      
-      QByteArray tempdata, postdata;
-      tempdata += "username=";
-      tempdata += username;
-      tempdata += "&password=";
-      tempdata += password;
-      tempdata += "&submit=Log+In";
-      
-      postdata = tempdata.toPercentEncoding("&=+");
-      
-      QByteArray header = "Content-Type";
-      QByteArray value = "application/x-www-form-urlencoded";
-      
+    QString loginurl = "http://10.244.23.50/schedulesdirect/login.php";
+    //    QString loginurl = "http://rkulagow.schedulesdirect.org/schedulesdirect/login.php";
+
+    LOG(VB_GENERAL, LOG_INFO, "Getting randhash from Schedules Direct");
+    MythDownloadManager *manager = GetMythDownloadManager();
+
+    QByteArray tempdata, postdata;
+    tempdata += "username=";
+    tempdata += username;
+    tempdata += "&password=";
+    tempdata += password;
+    tempdata += "&submit=Log+In";
+
+    postdata = tempdata.toPercentEncoding("&=+");
+
+    QByteArray header = "Content-Type";
+    QByteArray value = "application/x-www-form-urlencoded";
+
     if (!manager->postAuth(loginurl, &postdata, NULL, NULL, &header, &value))
     {
-     LOG(VB_GENERAL, LOG_INFO, QString("Could not post auth credentials to Schedules Direct."));
+        LOG(VB_GENERAL, LOG_INFO, QString("Could not post auth credentials to Schedules Direct."));
         return QString("error");
     }
 
-//    LOG(VB_GENERAL, LOG_INFO, "Uncompressing SchedulesDirect feed");
+    //    LOG(VB_GENERAL, LOG_INFO, "Uncompressing SchedulesDirect feed");
 
-// Next part is just for debugging
-/*    QString randhashFile = QString("/tmp/sd_randhash");
-    QFile file(randhashFile);
-    file.open(QIODevice::WriteOnly);
-    file.write(postdata);
-    file.close();
-*/
+    // Next part is just for debugging
+    /*    QString randhashFile = QString("/tmp/sd_randhash");
+        QFile file(randhashFile);
+        file.open(QIODevice::WriteOnly);
+        file.write(postdata);
+        file.close();
+    */
 
     QRegExp rx("randhash: ([a-z0-9]+)");
-    if (rx.indexIn(postdata) != -1) {
-     randhash = rx.cap(1);
-     LOG(VB_GENERAL, LOG_INFO, QString("randhash is %1").arg(randhash));
-     return randhash;
+
+    if (rx.indexIn(postdata) != -1)
+    {
+        randhash = rx.cap(1);
+        LOG(VB_GENERAL, LOG_INFO, QString("randhash is %1").arg(randhash));
+        return randhash;
     }
     else
     {
-     LOG(VB_GENERAL, LOG_INFO, QString("Could not decode randhash."));
-     return "error";
+        LOG(VB_GENERAL, LOG_INFO, QString("Could not decode randhash."));
+        return "error";
     }
 
 }
@@ -585,51 +592,86 @@ QString FillData::GetSDLoginRandhash(Source source)
 // Schedules Direct download XMLID files.
 bool FillData::DownloadSDFiles(QString randhash)
 {
-// Download all the unique XMLIDs
-QString xmltvid, url, destfile;
+    // Download all the unique XMLIDs
+    QString xmltvid, url, destfile;
 
-//QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
-QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
+    //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
+    QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
 
-            MSqlQuery query(MSqlQuery::InitCon());
-            query.prepare(
-            "SELECT distinct(xmltvid) FROM channel"
-            );
+    MSqlQuery query(MSqlQuery::InitCon());
+    query.prepare(
+        "SELECT distinct(xmltvid) FROM channel"
+    );
 
-            if (!query.exec())
-            {
-                MythDB::DBError("FillData::grabData", query);
-                return false;
-            }
+    if (!query.exec())
+    {
+        MythDB::DBError("FillData::grabData", query);
+        return false;
+    }
 
-            while (query.next())
-            // We're going to update all chanid's in the database that use this particular XMLID.
-            {
-              xmltvid = query.value(0).toString();
-              url = urlbase + "?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
-              destfile = "/tmp/" + xmltvid + "_sched.txt.gz";
-              GetMythDownloadManager()->download(url, destfile, false);
-            }
+    while (query.next())
+        // We're going to update all chanid's in the database that use this particular XMLID.
+    {
+        xmltvid = query.value(0).toString();
+        url = urlbase + "?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
+        destfile = "/tmp/" + xmltvid + "_sched.txt.gz";
+        GetMythDownloadManager()->download(url, destfile, false);
+    }
 
-return true;
+    return true;
 }
 
 
 // Schedules Direct check for lineup update
 bool FillData::is_SDHeadendVersionUpdated(Source source)
 {
-//QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
- QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
- QString lineup = source.lineupid;
- QString destfile;
+    //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
+    QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
+    QString lineup = source.lineupid;
+    int db_version = source.version;
+    QString db_modified = source.modified;
+    QString destfile;
+    QByteArray lineupdata_zipped, lineupdata_unzipped;
+  
 
-qDebug() << "lineup is " << lineup;
+    qDebug() << "lineup is " << lineup << "db version is " << db_version << "modified is " << db_modified;
 
     QString url = urlbase + "?command=get&p1=lineup&p2=" + lineup;
-              destfile = "/tmp/" + lineup + ".txt";
-              GetMythDownloadManager()->download(url, destfile, false);
+    destfile = "/tmp/" + lineup + ".txt";
+    GetMythDownloadManager()->download(url, &lineupdata_zipped, false);
+
+    lineupdata_unzipped = gUncompress(lineupdata_zipped);
+
+
+
+        QFile file(destfile);
+        file.open(QIODevice::WriteOnly);
+        file.write(lineupdata_unzipped);
+        file.close();
+
+    QRegExp rx("randhash: ([a-z0-9]+)");
+
+/*
+    if (rx.indexIn(postdata) != -1)
+    {
+        randhash = rx.cap(1);
+        LOG(VB_GENERAL, LOG_INFO, QString("randhash is %1").arg(randhash));
+        return true;
+    }
+    else
+    {
+        LOG(VB_GENERAL, LOG_INFO, QString("Could not decode randhash."));
+        return false;
+    }
+*/
+
+return false;    
     
-return false;
+
+
+
+
+
 }
 
 
@@ -787,6 +829,7 @@ bool FillData::InsertSDDataintoDatabase(
             QDateTime UTCdt_end = UTCdt_start.addSecs(duration);
 
             QVariantMap prog_info = parser.parse(program_information[i.key()].toLocal8Bit(), &ok).toMap();
+
             // Use the key (program ID) from the schedule to get the program information for that timeslot.
             if (!ok)
             {
@@ -802,10 +845,11 @@ bool FillData::InsertSDDataintoDatabase(
 
             MSqlQuery query(MSqlQuery::InitCon());
             query.prepare(
-            "SELECT chanid FROM channel WHERE xmltvid = :XMLID"
+                "SELECT chanid FROM channel WHERE xmltvid = :XMLID"
             );
 
             query.bindValue(":XMLID", filename.left(5));
+
             if (!query.exec())
             {
                 MythDB::DBError("FillData::grabData", query);
@@ -815,67 +859,67 @@ bool FillData::InsertSDDataintoDatabase(
             int chanid;
 
             if (query.next())
-            // We're going to update all chanid's in the database that use this particular XMLID.
+                // We're going to update all chanid's in the database that use this particular XMLID.
             {
 
-              chanid = query.value(0).toInt();
+                chanid = query.value(0).toInt();
 
-// Temp values
-bool is_subtitled = false;
+                // Temp values
+                bool is_subtitled = false;
 
 
-// Living dangerously, or speeding things up?
-// Sanity check on whether the downloaded data is valid first?
+                // Living dangerously, or speeding things up?
+                // Sanity check on whether the downloaded data is valid first?
 
-            MSqlQuery purge(MSqlQuery::InitCon());
-            purge.prepare(
-                "DELETE FROM program where chanid = :CHANID"
-            );
+                MSqlQuery purge(MSqlQuery::InitCon());
+                purge.prepare(
+                    "DELETE FROM program where chanid = :CHANID"
+                );
 
-            purge.bindValue(":CHANID", chanid);
+                purge.bindValue(":CHANID", chanid);
 
-            if (!purge.exec())
-            {
-                MythDB::DBError("Deleting data", purge);
-                return false;
-            }
+                if (!purge.exec())
+                {
+                    MythDB::DBError("Deleting data", purge);
+                    return false;
+                }
 
-            MSqlQuery insert(MSqlQuery::InitCon());
-            insert.prepare(
-                "INSERT INTO program ("
-                "chanid, starttime, endtime,"
-                "title, subtitle, description,"
-                "stereo, subtitled, hdtv,"
-                "closecaptioned, partnumber, parttotal,"
-                "seriesid, originalairdate, programid) "
-                "VALUES ("
-                ":CHANID, :STARTTIME, :ENDTIME,"
-                ":TITLE, :SUBTITLE, :DESCRIPTION,"
-                ":STEREO, :SUBTITLED, :HDTV,"
-                ":CLOSECAPTIONED, :PARTNUMBER, :PARTTOTAL,"
-                ":SERIESID, :ORIGINALAIRDATE, :PROGID)");
+                MSqlQuery insert(MSqlQuery::InitCon());
+                insert.prepare(
+                    "INSERT INTO program ("
+                    "chanid, starttime, endtime,"
+                    "title, subtitle, description,"
+                    "stereo, subtitled, hdtv,"
+                    "closecaptioned, partnumber, parttotal,"
+                    "seriesid, originalairdate, programid) "
+                    "VALUES ("
+                    ":CHANID, :STARTTIME, :ENDTIME,"
+                    ":TITLE, :SUBTITLE, :DESCRIPTION,"
+                    ":STEREO, :SUBTITLED, :HDTV,"
+                    ":CLOSECAPTIONED, :PARTNUMBER, :PARTTOTAL,"
+                    ":SERIESID, :ORIGINALAIRDATE, :PROGID)");
 
-            insert.bindValue(":CHANID", chanid);
-            insert.bindValue(":STARTTIME", UTCdt_start);
-            insert.bindValue(":ENDTIME", UTCdt_end);
-            insert.bindValue(":TITLE", title);
-            insert.bindValue(":SUBTITLE", epi_title);
-            insert.bindValue(":DESCRIPTION", descr);
-            insert.bindValue(":STEREO", is_stereo);
-            insert.bindValue(":SUBTITLED", is_subtitled);
-            insert.bindValue(":HDTV", is_hdtv);
-            insert.bindValue(":CLOSECAPTIONED", is_cc);
-            insert.bindValue(":PARTNUMBER", part_num);
-            insert.bindValue(":PARTTOTAL", num_parts);
-            insert.bindValue(":SERIESID", syn_epi_num);
-            insert.bindValue(":ORIGINALAIRDATE", orig_air_date);
-            insert.bindValue(":PROGID", i.key());
+                insert.bindValue(":CHANID", chanid);
+                insert.bindValue(":STARTTIME", UTCdt_start);
+                insert.bindValue(":ENDTIME", UTCdt_end);
+                insert.bindValue(":TITLE", title);
+                insert.bindValue(":SUBTITLE", epi_title);
+                insert.bindValue(":DESCRIPTION", descr);
+                insert.bindValue(":STEREO", is_stereo);
+                insert.bindValue(":SUBTITLED", is_subtitled);
+                insert.bindValue(":HDTV", is_hdtv);
+                insert.bindValue(":CLOSECAPTIONED", is_cc);
+                insert.bindValue(":PARTNUMBER", part_num);
+                insert.bindValue(":PARTTOTAL", num_parts);
+                insert.bindValue(":SERIESID", syn_epi_num);
+                insert.bindValue(":ORIGINALAIRDATE", orig_air_date);
+                insert.bindValue(":PROGID", i.key());
 
-            if (!insert.exec())
-            {
-                MythDB::DBError("Loading data", insert);
-                return false;
-            }
+                if (!insert.exec())
+                {
+                    MythDB::DBError("Loading data", insert);
+                    return false;
+                }
             }
         } // end of the while loop
     } // end of iterating through all the files.
@@ -976,7 +1020,7 @@ bool FillData::Run(SourceList &sourcelist)
                  xmltv_grabber == "/bin/true" ||
                  xmltv_grabber == "none")
         {
-            LOG(VB_GENERAL, LOG_INFO, 
+            LOG(VB_GENERAL, LOG_INFO,
                 QString("Source %1 configured with no grabber. Nothing to do.")
                 .arg((*it).id));
 
@@ -1028,9 +1072,10 @@ bool FillData::Run(SourceList &sourcelist)
                                                  QStringList("--capabilities"),
                                                  flags);
             grabber_capabilities_proc.Run(25);
+
             if (grabber_capabilities_proc.Wait() != GENERIC_EXIT_OK)
                 LOG(VB_GENERAL, LOG_ERR,
-                    QString("%1  --capabilities failed or we timed out waiting."                            
+                    QString("%1  --capabilities failed or we timed out waiting."
                             " You may need to upgrade your xmltv grabber")
                     .arg(xmltv_grabber));
             else
@@ -1038,6 +1083,7 @@ bool FillData::Run(SourceList &sourcelist)
                 QByteArray result = grabber_capabilities_proc.ReadAll();
                 QTextStream ostream(result);
                 QString capabilities;
+
                 while (!ostream.atEnd())
                 {
                     QString capability
@@ -1093,36 +1139,37 @@ bool FillData::Run(SourceList &sourcelist)
         need_post_grab_proc |= !is_grabber_datadirect(xmltv_grabber);
 
         if (xmltv_grabber == "schedulesdirect2")
-        { 
-        /*
-        * The "schedulesdirect1" grabber is for the internal grabber to TMS
-        * so we use schedulesdirect2 to differentiate.
-        * Process for downloading Schedules Direct JSON data files.
-        * Execute a login to http://rkulagow.schedulesdirect.org/login.php
-        * Scan the downloaded file for the randhash.
-        * Download status messages
-        * Check the version number of the headend
-        * 
-        */
-          QString randhash = GetSDLoginRandhash(*it);
-//qDebug() << "randhash is " << randhash;
-          if (randhash == "error")
-          {
-            qDebug() << "Error getting randhash.";
-            exit;
-          }
+        {
+            /*
+            * The "schedulesdirect1" grabber is for the internal grabber to TMS
+            * so we use schedulesdirect2 to differentiate.
+            * Process for downloading Schedules Direct JSON data files.
+            * Execute a login to http://rkulagow.schedulesdirect.org/login.php
+            * Scan the downloaded file for the randhash.
+            * Download status messages
+            * Check the version number of the headend
+            *
+            */
+            QString randhash = GetSDLoginRandhash(*it);
 
-          if(is_SDHeadendVersionUpdated(*it))
-          {
-qDebug() << "Headend updated. Do something here; write a message to the log.";
-          }
+            //qDebug() << "randhash is " << randhash;
+            if (randhash == "error")
+            {
+                qDebug() << "Error getting randhash.";
+                exit;
+            }
 
-          
-          if(!DownloadSDFiles(randhash))
-          {
-          qDebug() << "Error downloading files.";
-          }
-        
+            if (is_SDHeadendVersionUpdated(*it))
+            {
+                qDebug() << "Headend updated. Do something here; write a message to the log.";
+            }
+
+
+            if (!DownloadSDFiles(randhash))
+            {
+                qDebug() << "Error downloading files.";
+            }
+
         } // Done with the schedulesdirect stuff.
 
         if (is_grabber_datadirect(xmltv_grabber) && dd_grab_all)
@@ -1132,6 +1179,7 @@ qDebug() << "Headend updated. Do something here; write a message to the log.";
             else
             {
                 QDate qCurrentDate = MythDate::current().date();
+
                 if (!GrabData(*it, 0, &qCurrentDate))
                     ++failures;
             }
@@ -1387,11 +1435,12 @@ qDebug() << "Headend updated. Do something here; write a message to the log.";
         else
         {
             if (xmltv_grabber != "schedulesdirect2")
-            { // only print an error if we're not using schedulesdirect2
-            LOG(VB_GENERAL, LOG_ERR,
-                QString("Grabbing XMLTV data using ") + xmltv_grabber +
-                " is not supported. You may need to upgrade to"
-                " the latest version of XMLTV.");
+            {
+                // only print an error if we're not using schedulesdirect2
+                LOG(VB_GENERAL, LOG_ERR,
+                    QString("Grabbing XMLTV data using ") + xmltv_grabber +
+                    " is not supported. You may need to upgrade to"
+                    " the latest version of XMLTV.");
             }
         }
 

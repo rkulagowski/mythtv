@@ -48,7 +48,7 @@ typedef vector<Source> SourceList;
 
 class FillData
 {
-  public:
+public:
     FillData() :
         raw_lineup(0),                  maxDays(0),
         interrupted(false),             endofdata(false),
@@ -86,7 +86,7 @@ class FillData
         kRefreshAll   = 0xFFFF1,
     };
 
-  public:
+public:
     ProgramData         prog_data;
     ChannelData         chan_data;
     XMLTVParser         xmltv_parser;
@@ -108,8 +108,8 @@ class FillData
     bool    only_update_channels;
     bool    channel_update_run;
 
-  private:
-    QMap<uint,bool>     refresh_day;
+private:
+    QMap<uint, bool>     refresh_day;
     bool                refresh_all;
     mutable QStringList fatalErrors;
 };

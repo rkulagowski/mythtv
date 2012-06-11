@@ -13,5 +13,6 @@ bool dash_open(QFile &file, const QString &filename,
                int m, FILE *handle = NULL);
 
 QString SetupIconCacheDirectory(void);
+QByteArray gUncompress(const QByteArray &data);
 
 #endif // _FILLUTIL_H_
