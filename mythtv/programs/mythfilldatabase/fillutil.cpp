@@ -15,22 +15,25 @@
 bool dash_open(QFile &file, const QString &filename, int m, FILE *handle)
 {
     bool retval = false;
+
     if (filename == "-")
     {
         if (handle == NULL)
         {
             handle = stdout;
+
             if (m & QIODevice::ReadOnly)
             {
                 handle = stdin;
             }
         }
-        retval = file.open( handle, (QIODevice::OpenMode)m );
+
+        retval = file.open(handle, (QIODevice::OpenMode)m);
     }
     else
     {
         file.setFileName(filename);
-        retval = file.open( (QIODevice::OpenMode)m );
+        retval = file.open((QIODevice::OpenMode)m);
     }
 
     return retval;
@@ -41,12 +44,14 @@ QString SetupIconCacheDirectory(void)
     QString fileprefix = GetConfDir();
 
     QDir dir(fileprefix);
+
     if (!dir.exists())
         dir.mkdir(fileprefix);
 
     fileprefix += "/channels";
 
     dir = QDir(fileprefix);
+
     if (!dir.exists())
         dir.mkdir(fileprefix);
 
@@ -55,7 +60,7 @@ QString SetupIconCacheDirectory(void)
 
 
 /*
- * This function taken from: 
+ * This function taken from:
  * http://stackoverflow.com/questions/2690328/qt-quncompress-gzip-data
  *
  * Based on zlib example code.
@@ -88,7 +93,8 @@ QString SetupIconCacheDirectory(void)
 
 QByteArray gUncompress(const QByteArray &data)
 {
-    if (data.size() <= 4) {
+    if (data.size() <= 4)
+    {
         LOG(VB_GENERAL, LOG_WARNING, "gUncompress: Input data is truncated");
         return QByteArray();
     }
@@ -105,31 +111,35 @@ QByteArray gUncompress(const QByteArray &data)
     strm.zfree = Z_NULL;
     strm.opaque = Z_NULL;
     strm.avail_in = data.size();
-    strm.next_in = (Bytef*)(data.data());
+    strm.next_in = (Bytef *)(data.data());
 
     ret = inflateInit2(&strm, 15 +  32); // gzip decoding
+
     if (ret != Z_OK)
         return QByteArray();
 
     // run inflate()
-    do {
+    do
+    {
         strm.avail_out = CHUNK_SIZE;
-        strm.next_out = (Bytef*)(out);
+        strm.next_out = (Bytef *)(out);
 
         ret = inflate(&strm, Z_NO_FLUSH);
         Q_ASSERT(ret != Z_STREAM_ERROR);  // state not clobbered
 
-        switch (ret) {
-        case Z_NEED_DICT:
-            ret = Z_DATA_ERROR;     // and fall through
-        case Z_DATA_ERROR:
-        case Z_MEM_ERROR:
-            (void)inflateEnd(&strm);
-            return QByteArray();
+        switch (ret)
+        {
+            case Z_NEED_DICT:
+                ret = Z_DATA_ERROR;     // and fall through
+            case Z_DATA_ERROR:
+            case Z_MEM_ERROR:
+                (void)inflateEnd(&strm);
+                return QByteArray();
         }
 
         result.append(out, CHUNK_SIZE - strm.avail_out);
-    } while (strm.avail_out == 0);
+    }
+    while (strm.avail_out == 0);
 
     // clean up and return
     inflateEnd(&strm);
