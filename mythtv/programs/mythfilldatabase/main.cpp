@@ -465,7 +465,7 @@ int main(int argc, char *argv[])
         }
 
         QString querystr = QString("SELECT sourceid,name,xmltvgrabber,userid,"
-                                   "password,lineupid "
+                                   "password,lineupid,version,modified "
                                    "FROM videosource ") + where +
                                    QString(" ORDER BY sourceid;");
 
@@ -483,6 +483,8 @@ int main(int argc, char *argv[])
                        newsource.userid = sourcequery.value(3).toString();
                        newsource.password = sourcequery.value(4).toString();
                        newsource.lineupid = sourcequery.value(5).toString();
+                       newsource.version = sourcequery.value(6).toInt();
+                       newsource.modified = sourcequery.value(7).toString();
 
                        newsource.xmltvgrabber_baseline = false;
                        newsource.xmltvgrabber_manualconfig = false;
