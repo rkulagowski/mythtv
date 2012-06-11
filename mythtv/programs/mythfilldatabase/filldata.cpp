@@ -559,11 +559,9 @@ QString FillData::GetSDLoginRandhash(Source source)
 
     if (!manager->postAuth(loginurl, &postdata, NULL, NULL, &header, &value))
     {
-        LOG(VB_GENERAL, LOG_INFO, QString("Could not post auth credentials to Schedules Direct."));
+        LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not post auth credentials to Schedules Direct."));
         return QString("error");
     }
-
-    //    LOG(VB_GENERAL, LOG_INFO, "Uncompressing SchedulesDirect feed");
 
     // Next part is just for debugging
     /*    QString randhashFile = QString("/tmp/sd_randhash");
@@ -583,7 +581,7 @@ QString FillData::GetSDLoginRandhash(Source source)
     }
     else
     {
-        LOG(VB_GENERAL, LOG_INFO, QString("Could not decode randhash."));
+        LOG(VB_GENERAL, LOG_ERR, QString("Could not decode randhash."));
         return "error";
     }
 
@@ -619,9 +617,17 @@ bool FillData::DownloadSDFiles(QString randhash)
         destfile = "/tmp/" + xmltvid + "_sched.txt";
         GetMythDownloadManager()->download(url, &dl_file, false);
         QFile file(destfile);
-        file.open(QIODevice::WriteOnly);
-        file.write(gUncompress(dl_file));
-        file.close();
+
+        if (file.open(QIODevice::WriteOnly))
+        {
+            file.write(gUncompress(dl_file));
+            file.close();
+        }
+        else
+        {
+            LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not create file %1").arg(destfile));
+            return false;
+        }
     }
 
     return true;
@@ -638,7 +644,6 @@ bool FillData::getSchedulesDirectStatusMessages(QString randhash)
     url = urlbase + "?command=get&p1=status&rand=$randhash";
     destfile = "/tmp/" + qdtNow.toLocalTime().toString(Qt::ISODate) + "-status.txt";
 
-    qDebug() << "destfile is " << destfile;
     GetMythDownloadManager()->download(url, destfile, false);
 
 }
