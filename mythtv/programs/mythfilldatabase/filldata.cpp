@@ -671,27 +671,73 @@ bool FillData::is_SDHeadendVersionUpdated(Source source)
     QString url = urlbase + "?command=get&p1=lineup&p2=" + lineup;
     destfile = "/tmp/" + lineup + ".txt";
     GetMythDownloadManager()->download(url, &lineupdata, false);
+    lineupdata = gUncompress(lineupdata);
 
     QFile file(destfile);
     file.open(QIODevice::WriteOnly);
-    file.write(gUncompress(lineupdata));
+    file.write(lineupdata);
     file.close();
+    
+    file.open(QIODevice::ReadOnly | QIODevice::Text);
+    
+    QTextStream in(&file);
+    while(!in.atEnd()) {
+    QString line = in.readLine();
 
-    QRegExp rx("randhash: ([a-z0-9]+)");
+if (line.startsWith("Name")) {
 
-    /*
-        if (rx.indexIn(postdata) != -1)
-        {
-            randhash = rx.cap(1);
-            LOG(VB_GENERAL, LOG_INFO, QString("randhash is %1").arg(randhash));
-            return true;
-        }
-        else
-        {
-            LOG(VB_GENERAL, LOG_INFO, QString("Could not decode randhash."));
-            return false;
-        }
-    */
+    QStringList field = line.split("|");
+//    QStringList field = line.split("Name:(\\w+)|Location:(\\w+)|headend:(\\w)|devicetype:(\\D*)|Version:(\\d+)|Date:(.{10})$");
+
+//qDebug() << "Name" << field[0] << "Location" << field[1] << "Headend" <<
+//field[2] << "devicetype" << field[3] << "Version" << field[4] << "Date" <<
+//field[5];
+
+//QRegExp rx("Name:(\\w+)\|Location:(\\w+)\|headend:(\\w)\|devicetype:(\\D*)\|Version:(\\d+)\|Date:(.{10})");
+QRegExp rx(":");
+
+rx.indexIn(field[0]);
+qDebug() << "Name" << field[0];
+qDebug() << "Name" << rx.cap(1);
+
+rx.indexIn(field[1]);
+qDebug() << "Location" << field[1];
+qDebug() << "Location" << rx.cap(1);
+
+rx.indexIn(field[2]);
+qDebug() << "headend" << rx.cap(1);
+
+rx.indexIn(field[3]);
+qDebug() << "devicetype" << rx.cap(1);
+
+rx.indexIn(field[4]);
+qDebug() << "version" << rx.cap(1);
+
+rx.indexIn(field[5]);
+qDebug() << "date" << rx.cap(1);
+
+//qDebug() << "Name" << rx.cap(1) << "Location" << rx.cap(2) << "Headend" << rx.cap(3) << "devicetype" << rx.cap(3) << "Version" << rx.cap(4) << "date" << rx.cap(5);
+
+
+}    
+    }
+
+file.close();    
+
+//    QRegExp rx("Name:(\w+)\|Location:(\w+)\|headend:(\w)\|devicetype:(\D*)\|Version:(\d+)\|Date:(.{10})");
+
+    
+
+ 
+    
+
+
+//        if (rx.indexIn(lineupdata) != -1)
+//        {
+//            qDebug() << "Name" << rx.cap(1) << "Location" << rx.cap(2) << "Headend" << rx.cap(3) << "devicetype" << rx.cap(3) << "Version" << rx.cap(4) << "date" << rx.cap(5);
+//            LOG(VB_GENERAL, LOG_INFO, QString("randhash is %1").arg(randhash));
+//            return true;
+//        }
 
     return false;
 
