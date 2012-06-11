@@ -627,6 +627,23 @@ bool FillData::DownloadSDFiles(QString randhash)
     return true;
 }
 
+bool FillData::getSchedulesDirectStatusMessages(QString randhash)
+{
+    //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
+    QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
+    QString url;
+    QString destfile;
+    QDateTime qdtNow = MythDate::current();
+
+    url = urlbase + "?command=get&p1=status&rand=$randhash";
+    destfile = "/tmp/" + qdtNow.toLocalTime().toString(Qt::ISODate) + "-status.txt";
+
+    qDebug() << "destfile is " << destfile;
+    GetMythDownloadManager()->download(url, destfile, false);
+
+}
+
+
 
 // Schedules Direct check for lineup update
 bool FillData::is_SDHeadendVersionUpdated(Source source)
@@ -637,17 +654,22 @@ bool FillData::is_SDHeadendVersionUpdated(Source source)
     int db_version = source.version;
     QString db_modified = source.modified;
     QString destfile;
-    QByteArray lineupdata_zipped;
+    QByteArray lineupdata;
 
     qDebug() << "lineup is " << lineup << "db version is " << db_version << "modified is " << db_modified;
 
+    /*
+    * We don't specify the randhash because we don't need to. The lineup
+    * function at Schedules Direct is open so that it can be used by the QAM
+    * scanner.
+    */
     QString url = urlbase + "?command=get&p1=lineup&p2=" + lineup;
     destfile = "/tmp/" + lineup + ".txt";
-    GetMythDownloadManager()->download(url, &lineupdata_zipped, false);
+    GetMythDownloadManager()->download(url, &lineupdata, false);
 
     QFile file(destfile);
     file.open(QIODevice::WriteOnly);
-    file.write(gUncompress(lineupdata_zipped));
+    file.write(gUncompress(lineupdata));
     file.close();
 
     QRegExp rx("randhash: ([a-z0-9]+)");
@@ -667,11 +689,6 @@ bool FillData::is_SDHeadendVersionUpdated(Source source)
     */
 
     return false;
-
-
-
-
-
 
 }
 
@@ -1158,6 +1175,11 @@ bool FillData::Run(SourceList &sourcelist)
             {
                 qDebug() << "Error getting randhash.";
                 exit;
+            }
+
+            if (getSchedulesDirectStatusMessages(randhash))
+            {
+                qDebug() << "Status message from Schedules Direct";
             }
 
             if (is_SDHeadendVersionUpdated(*it))
