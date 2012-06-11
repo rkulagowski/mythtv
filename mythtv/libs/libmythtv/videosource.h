@@ -27,6 +27,7 @@ static inline bool is_grabber_external(const QString &grabber)
     return !(grabber == "datadirect" ||
              grabber == "eitonly" ||
              grabber == "schedulesdirect1" ||
+             grabber == "schedulesdirect2" ||
              grabber == "/bin/true");
 }
 
