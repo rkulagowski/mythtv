@@ -632,7 +632,7 @@ bool FillData::is_SDHeadendVersionUpdated(Source source)
     QString db_modified = source.modified;
     QString destfile;
     QByteArray lineupdata_zipped, lineupdata_unzipped;
-  
+
 
     qDebug() << "lineup is " << lineup << "db version is " << db_version << "modified is " << db_modified;
 
@@ -644,29 +644,29 @@ bool FillData::is_SDHeadendVersionUpdated(Source source)
 
 
 
-        QFile file(destfile);
-        file.open(QIODevice::WriteOnly);
-        file.write(lineupdata_unzipped);
-        file.close();
+    QFile file(destfile);
+    file.open(QIODevice::WriteOnly);
+    file.write(lineupdata_unzipped);
+    file.close();
 
     QRegExp rx("randhash: ([a-z0-9]+)");
 
-/*
-    if (rx.indexIn(postdata) != -1)
-    {
-        randhash = rx.cap(1);
-        LOG(VB_GENERAL, LOG_INFO, QString("randhash is %1").arg(randhash));
-        return true;
-    }
-    else
-    {
-        LOG(VB_GENERAL, LOG_INFO, QString("Could not decode randhash."));
-        return false;
-    }
-*/
+    /*
+        if (rx.indexIn(postdata) != -1)
+        {
+            randhash = rx.cap(1);
+            LOG(VB_GENERAL, LOG_INFO, QString("randhash is %1").arg(randhash));
+            return true;
+        }
+        else
+        {
+            LOG(VB_GENERAL, LOG_INFO, QString("Could not decode randhash."));
+            return false;
+        }
+    */
 
-return false;    
-    
+    return false;
+
 
 
 
