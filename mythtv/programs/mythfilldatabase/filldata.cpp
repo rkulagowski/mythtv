@@ -598,6 +598,8 @@ bool FillData::DownloadSDFiles(QString randhash)
     //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
     QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
 
+    QByteArray dl_file;
+
     MSqlQuery query(MSqlQuery::InitCon());
     query.prepare(
         "SELECT distinct(xmltvid) FROM channel"
@@ -614,8 +616,12 @@ bool FillData::DownloadSDFiles(QString randhash)
     {
         xmltvid = query.value(0).toString();
         url = urlbase + "?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
-        destfile = "/tmp/" + xmltvid + "_sched.txt.gz";
-        GetMythDownloadManager()->download(url, destfile, false);
+        destfile = "/tmp/" + xmltvid + "_sched.txt";
+        GetMythDownloadManager()->download(url, &dl_file, false);
+        QFile file(destfile);
+        file.open(QIODevice::WriteOnly);
+        file.write(gUncompress(dl_file));
+        file.close();
     }
 
     return true;
@@ -631,8 +637,7 @@ bool FillData::is_SDHeadendVersionUpdated(Source source)
     int db_version = source.version;
     QString db_modified = source.modified;
     QString destfile;
-    QByteArray lineupdata_zipped, lineupdata_unzipped;
-
+    QByteArray lineupdata_zipped;
 
     qDebug() << "lineup is " << lineup << "db version is " << db_version << "modified is " << db_modified;
 
@@ -640,13 +645,9 @@ bool FillData::is_SDHeadendVersionUpdated(Source source)
     destfile = "/tmp/" + lineup + ".txt";
     GetMythDownloadManager()->download(url, &lineupdata_zipped, false);
 
-    lineupdata_unzipped = gUncompress(lineupdata_zipped);
-
-
-
     QFile file(destfile);
     file.open(QIODevice::WriteOnly);
-    file.write(lineupdata_unzipped);
+    file.write(gUncompress(lineupdata_zipped));
     file.close();
 
     QRegExp rx("randhash: ([a-z0-9]+)");
