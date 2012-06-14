@@ -217,11 +217,6 @@ bool setupTVs(bool ismaster, bool &error)
 
 void cleanup(void)
 {
-    signal(SIGTERM, SIG_DFL);
-#ifndef _MSC_VER
-    signal(SIGUSR1, SIG_DFL);
-#endif
-
     if (mainServer)
         mainServer->Stop();
 
@@ -444,7 +439,7 @@ int connect_to_master(void)
         if (tempMonitorAnnounce.empty() ||
             tempMonitorAnnounce[0] == "ERROR")
         {
-            tempMonitorConnection->DownRef();
+            tempMonitorConnection->DecrRef();
             tempMonitorConnection = NULL;
             if (tempMonitorAnnounce.empty())
             {
@@ -484,7 +479,7 @@ int connect_to_master(void)
                 QString("Current time on the master backend differs by "
                         "%1 seconds from time on this system. Exiting.")
                 .arg(timediff));
-            tempMonitorConnection->DownRef();
+            tempMonitorConnection->DecrRef();
             return GENERIC_EXIT_INVALID_TIME;
         }
 
@@ -497,7 +492,7 @@ int connect_to_master(void)
         }
     }
     if (tempMonitorConnection)
-        tempMonitorConnection->DownRef();
+        tempMonitorConnection->DecrRef();
 
     return GENERIC_EXIT_OK;
 }
