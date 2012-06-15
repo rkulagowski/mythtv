@@ -673,72 +673,78 @@ bool FillData::is_SDHeadendVersionUpdated(Source source)
     GetMythDownloadManager()->download(url, &lineupdata, false);
     lineupdata = gUncompress(lineupdata);
 
-    QFile file(destfile);
+/*    QFile file(destfile);
     file.open(QIODevice::WriteOnly);
     file.write(lineupdata);
     file.close();
-    
-    file.open(QIODevice::ReadOnly | QIODevice::Text);
-    
+*/
+
+/*    file.open(QIODevice::ReadOnly | QIODevice::Text);
+
     QTextStream in(&file);
-    while(!in.atEnd()) {
-    QString line = in.readLine();
 
-if (line.startsWith("Name")) {
-
-    QStringList field = line.split("|");
-//    QStringList field = line.split("Name:(\\w+)|Location:(\\w+)|headend:(\\w)|devicetype:(\\D*)|Version:(\\d+)|Date:(.{10})$");
-
-//qDebug() << "Name" << field[0] << "Location" << field[1] << "Headend" <<
-//field[2] << "devicetype" << field[3] << "Version" << field[4] << "Date" <<
-//field[5];
-
-//QRegExp rx("Name:(\\w+)\|Location:(\\w+)\|headend:(\\w)\|devicetype:(\\D*)\|Version:(\\d+)\|Date:(.{10})");
-QRegExp rx(":");
-
-rx.indexIn(field[0]);
-qDebug() << "Name" << field[0];
-qDebug() << "Name" << rx.cap(1);
-
-rx.indexIn(field[1]);
-qDebug() << "Location" << field[1];
-qDebug() << "Location" << rx.cap(1);
-
-rx.indexIn(field[2]);
-qDebug() << "headend" << rx.cap(1);
-
-rx.indexIn(field[3]);
-qDebug() << "devicetype" << rx.cap(1);
-
-rx.indexIn(field[4]);
-qDebug() << "version" << rx.cap(1);
-
-rx.indexIn(field[5]);
-qDebug() << "date" << rx.cap(1);
-
-//qDebug() << "Name" << rx.cap(1) << "Location" << rx.cap(2) << "Headend" << rx.cap(3) << "devicetype" << rx.cap(3) << "Version" << rx.cap(4) << "date" << rx.cap(5);
-
-
-}    
+    while (!in.atEnd())
+    {
+        QString line = in.readLine();
     }
 
-file.close();    
 
-//    QRegExp rx("Name:(\w+)\|Location:(\w+)\|headend:(\w)\|devicetype:(\D*)\|Version:(\d+)\|Date:(.{10})");
+    file.close();
+*/
 
+        QJson::Parser parser;
+        bool ok;
+            QVariantMap result = parser.parse(lineupdata, &ok).toMap();
+
+            if (!ok)
+            {
+                printf("line %d: %s\n", parser.errorLine(), parser.errorString().toUtf8().data());
+                return false;
+            }
+
+            qDebug() << "Location: " << result["location"].toString();
+            qDebug() << "Name: " << result["name"].toString();
+
+            QVariant devtypes;
+
+            foreach (devtypes, result["DeviceTypes"].toList()) 
+            {
+               qDebug() << "Device: " << devtypes.toString();
+            }
+
+            QVariantMap abc = result["X"].toMap();
+
+//            qDebug() << "abc: " << abc["ChanData"].toList();
+
+            QVariant def = abc["ChanData"].toList();
+
+            qDebug() << "def:" << def.toString();
+
+
+/*
+               foreach (QVariant nested, result[devtype.toString()].toMap())
+               {
+                 qDebug() << "version: " << nested["version"].toString();
+                 qDebug() << "modified: " << nested["modified"].toString();
+               }
+            
+*/
+
+
+
+
+
+/*            if (result["datatype"].toString() == "schedule")
+            {
+                schedule[result["prog_id"].toString()] = line;
+            }
+            else
+            {
+                program_information[result["prog_id"].toString()] = line;
+            }
+        } // done reading in all the data.
+*/
     
-
- 
-    
-
-
-//        if (rx.indexIn(lineupdata) != -1)
-//        {
-//            qDebug() << "Name" << rx.cap(1) << "Location" << rx.cap(2) << "Headend" << rx.cap(3) << "devicetype" << rx.cap(3) << "Version" << rx.cap(4) << "date" << rx.cap(5);
-//            LOG(VB_GENERAL, LOG_INFO, QString("randhash is %1").arg(randhash));
-//            return true;
-//        }
-
     return false;
 
 }
