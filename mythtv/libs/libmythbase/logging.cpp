@@ -21,6 +21,7 @@ using namespace std;
 #include "loggingserver.h"
 #include "mythconfig.h"
 #include "mythdb.h"
+#include "mythdirs.h"
 #include "mythcorecontext.h"
 #include "mythsystem.h"
 #include "dbutil.h"
@@ -417,12 +418,11 @@ void LoggerThread::launchLogServer(void)
 
         MythSystemMask mask = MythSystemMask(kMSDontBlockInputDevs |
                                              kMSDontDisableDrawing |
-                                             kMSRunBackground |
                                              kMSRunShell);
         QStringList args;
         args << "--daemon" << logPropagateArgs;
 
-        MythSystem ms("mythlogserver", args, mask);
+        MythSystem ms(GetInstallPrefix() + "/bin/mythlogserver", args, mask);
         ms.Run();
     }
 }
