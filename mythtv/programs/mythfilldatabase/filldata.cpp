@@ -134,7 +134,7 @@ void FillData::DataDirectStationUpdate(Source source, bool update_icons)
 
     // Unselect channels not in users lineup for DVB, HDTV
     if (!insert_channels && (new_channels > 0) &&
-            is_grabber_labs(source.xmltvgrabber))
+        is_grabber_labs(source.xmltvgrabber))
     {
         bool ok0 = (logged_in == source.userid);
         bool ok1 = (raw_lineup == source.id);
@@ -587,50 +587,82 @@ QString FillData::GetSDLoginRandhash(Source source)
 
 }
 
-// Schedules Direct download XMLID files.
-bool FillData::DownloadSDFiles(QString randhash)
+// Schedules Direct download various files.
+bool FillData::DownloadSDFiles(QString randhash, QString whattoget)
 {
-    // Download all the unique XMLIDs
-    QString xmltvid, url, destfile;
 
     //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
     QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
+    QString url;
+    QString destfile;
 
     QByteArray dl_file;
 
-    MSqlQuery query(MSqlQuery::InitCon());
-    query.prepare(
-        "SELECT distinct(xmltvid) FROM channel"
-    );
-
-    if (!query.exec())
+    if (whattoget == "schedule"  || whattoget == "meta")
     {
-        MythDB::DBError("FillData::grabData", query);
-        return false;
-    }
+        // Download all the unique XMLIDs
+        QString xmltvid;
 
-    while (query.next())
-        // We're going to update all chanid's in the database that use this particular XMLID.
-    {
-        xmltvid = query.value(0).toString();
-        url = urlbase + "?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
-        destfile = "/tmp/" + xmltvid + "_sched.txt";
-        GetMythDownloadManager()->download(url, &dl_file, false);
-        QFile file(destfile);
+        MSqlQuery query(MSqlQuery::InitCon());
+        query.prepare(
+            "SELECT distinct(xmltvid) FROM channel"
+        );
 
-        if (file.open(QIODevice::WriteOnly))
+        if (!query.exec())
         {
-            file.write(gUncompress(dl_file));
-            file.close();
-        }
-        else
-        {
-            LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not create file %1").arg(destfile));
+            MythDB::DBError("FillData::grabData", query);
             return false;
         }
+
+        while (query.next())
+            // We're going to update all chanid's in the database that use this
+            // particular XMLID no matter where they are.
+        {
+            xmltvid = query.value(0).toString();
+
+            if (whattoget == "schedule")
+            {
+                url = urlbase + "?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
+                destfile = "/tmp/" + xmltvid + "_sched.txt";
+            }
+            else
+            {
+                url = urlbase + "?command=get&p1=meta&p2=" + xmltvid + "&rand=" + randhash;
+                destfile = "/tmp/" + xmltvid + "_meta.txt";
+            }
+
+            GetMythDownloadManager()->download(url, &dl_file, false);
+            QFile file(destfile);
+
+            if (file.open(QIODevice::WriteOnly))
+            {
+                file.write(gUncompress(dl_file));
+                file.close();
+            }
+            else
+            {
+                LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not create file %1").arg(destfile));
+                return false;
+            }
+        }
+
+        return true;
+    } // end of downloading schedules
+
+    if (whattoget == "lineup")
+    {
     }
 
-    return true;
+    if (whattoget == "status")
+    {
+        url = urlbase + "?command=get&p1=status&rand=" + randhash;
+        QDateTime qdtNow = MythDate::current();
+        destfile = "/tmp/" + qdtNow.toLocalTime().toString(Qt::ISODate) + "-status.txt";
+        GetMythDownloadManager()->download(url, destfile, false);
+        return true;
+
+    }
+
 }
 
 bool FillData::getSchedulesDirectStatusMessages(QString randhash)
@@ -665,8 +697,8 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
     }
     else
     {
-        lineup = source.lineupid.section(':',0,1);
-        device = source.lineupid.section(':',1,-1);
+        lineup = source.lineupid.section(':', 0, 1);
+        device = source.lineupid.section(':', 1, -1);
     }
 
     if (device == "")
@@ -697,16 +729,16 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
         return -1;
     }
 
-    foreach (QVariant devtypes, result["DeviceTypes"].toList())
+    foreach(QVariant devtypes, result["DeviceTypes"].toList())
     {
         QVariantMap nestedLineupInfo = result[devtypes.toString()].toMap();
 
         if (devtypes.toString() == device)
         {
 
-            if 
+            if
             (
-                (nestedLineupInfo["version"].toInt() != source.version ) || 
+                (nestedLineupInfo["version"].toInt() != source.version) ||
                 (nestedLineupInfo["modified"].toString() != source.modified)
             )
             {
@@ -794,7 +826,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
         QJson::Parser parser;
         bool ok;
 
-        LOG(VB_GENERAL, LOG_INFO, QString("Loaded file: %1").arg(filename));
+        LOG(VB_GENERAL, LOG_INFO, QString("Parsing file: %1").arg(filename));
 
         QMap<QString, QString> schedule;
         QMap<QString, QString> program_information;
@@ -1019,9 +1051,9 @@ bool FillData::Run(SourceList &sourcelist)
         for (it2 = sourcelist.begin(); it2 != sourcelist.end(); ++it2)
         {
             if (((*it).id           != (*it2).id)           &&
-                    ((*it).xmltvgrabber == (*it2).xmltvgrabber) &&
-                    ((*it).userid       == (*it2).userid)       &&
-                    ((*it).password     == (*it2).password))
+                ((*it).xmltvgrabber == (*it2).xmltvgrabber) &&
+                ((*it).userid       == (*it2).userid)       &&
+                ((*it).password     == (*it2).password))
             {
                 (*it).dd_dups.push_back((*it2).id);
             }
@@ -1197,7 +1229,7 @@ bool FillData::Run(SourceList &sourcelist)
             * Scan the downloaded file for the randhash.
             * Download status messages
             * Check the version number of the headend
-            * 
+            *
             *
             */
             QString randhash = GetSDLoginRandhash(*it);
@@ -1209,12 +1241,16 @@ bool FillData::Run(SourceList &sourcelist)
                 exit;
             }
 
-            if (getSchedulesDirectStatusMessages(randhash))
-            {
-                qDebug() << "Status message from Schedules Direct";
-            }
+            /*            if (getSchedulesDirectStatusMessages(randhash))
+                        {
+                            qDebug() << "Status message from Schedules Direct";
+                        }
+            */
+
+            DownloadSDFiles(randhash, "status");
 
             int retval = is_SDHeadendVersionUpdated(*it);
+
             if (retval == -1)
             {
                 qDebug() << "Error";
@@ -1224,12 +1260,17 @@ bool FillData::Run(SourceList &sourcelist)
                 qDebug() << "Headend updated. Do something here; write a message to the log.";
             }
 
-            if (!DownloadSDFiles(randhash))
+            if (!DownloadSDFiles(randhash, "schedule"))
             {
-                qDebug() << "Error downloading files.";
+                qDebug() << "Error downloading schedules.";
                 exit;
             }
-            
+            if (!DownloadSDFiles(randhash, "meta"))
+            {
+                qDebug() << "Error downloading metadata for channels.";
+                exit;
+            }
+
             if (!InsertSDDataintoDatabase(*it))
             {
                 qDebug() << "Error inserting SD data.";
@@ -1339,7 +1380,7 @@ bool FillData::Run(SourceList &sourcelist)
                                "GROUP BY c.chanid;";
 
                     if (query.exec(querystr.arg(i - 1).arg(i).arg((*it).id)) &&
-                            query.isActive())
+                        query.isActive())
                     {
                         int prevChanCount = 0;
                         int currentChanCount = 0;
@@ -1364,7 +1405,7 @@ bool FillData::Run(SourceList &sourcelist)
                         }
 
                         if (query.exec(querystr.arg(i).arg(i + 1).arg((*it).id))
-                                && query.isActive())
+                            && query.isActive())
                         {
                             LOG(VB_CHANNEL, LOG_INFO,
                                 QString("Checking program counts for day %1")
@@ -1548,7 +1589,7 @@ bool FillData::Run(SourceList &sourcelist)
     if (failures == 0)
     {
         if (nonewdata > 0 &&
-                (total_sources != externally_handled))
+            (total_sources != externally_handled))
             status = QString(QObject::tr(
                                  "mythfilldatabase ran, but did not insert "
                                  "any new data into the Guide for %1 of %2 sources. "
