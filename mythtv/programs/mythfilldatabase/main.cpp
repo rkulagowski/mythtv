@@ -478,12 +478,12 @@ int main(int argc, char *argv[])
         fill_data.GrabDataFromDDFile(
             fromfile_id, fromfile_offset, fromfile_name, fromddfile_lineupid);
     }
-    else if (from_sd_file)
+/*    else if (from_sd_file)
     {
         fill_data.InsertSDDataintoDatabase(
             fromfile_id, fromsdfile_lineupid);
     }
-
+*/
     else
     {
         SourceList sourcelist;
