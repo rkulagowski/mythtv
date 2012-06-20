@@ -641,11 +641,11 @@ bool FillData::getSchedulesDirectStatusMessages(QString randhash)
     QString destfile;
     QDateTime qdtNow = MythDate::current();
 
-    url = urlbase + "?command=get&p1=status&rand=$randhash";
+    url = urlbase + "?command=get&p1=status&rand=" + randhash;
     destfile = "/tmp/" + qdtNow.toLocalTime().toString(Qt::ISODate) + "-status.txt";
 
     GetMythDownloadManager()->download(url, destfile, false);
-
+    return true;
 }
 
 
@@ -723,10 +723,12 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
 
 
 // Schedules Direct json-formatted data
-bool FillData::InsertSDDataintoDatabase(
-    int id, const QString &lineupid)
+bool FillData::InsertSDDataintoDatabase(Source source)
+//    int id, const QString &lineupid)
 {
     // Information relating to schedules
+    QString lineupid = source.lineupid;
+
     bool subject_to_blackout, educational, time_approximate;
     bool joined_in_progress, left_in_progress;
     bool sex_rating, dialog_rating, tv_rating, violence_rating;
@@ -1195,6 +1197,7 @@ bool FillData::Run(SourceList &sourcelist)
             * Scan the downloaded file for the randhash.
             * Download status messages
             * Check the version number of the headend
+            * 
             *
             */
             QString randhash = GetSDLoginRandhash(*it);
@@ -1224,6 +1227,12 @@ bool FillData::Run(SourceList &sourcelist)
             if (!DownloadSDFiles(randhash))
             {
                 qDebug() << "Error downloading files.";
+                exit;
+            }
+            
+            if (!InsertSDDataintoDatabase(*it))
+            {
+                qDebug() << "Error inserting SD data.";
             }
 
         } // Done with the schedulesdirect stuff.

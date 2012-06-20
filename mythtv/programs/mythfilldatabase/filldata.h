@@ -73,7 +73,7 @@ public:
 
     QString GetSDLoginRandhash(Source source);
     bool DownloadSDFiles(QString randhash);
-    bool InsertSDDataintoDatabase(int id, const QString &lineupid);
+    bool InsertSDDataintoDatabase(Source source);
     int is_SDHeadendVersionUpdated(Source source);
     bool getSchedulesDirectStatusMessages(QString randhash);
 
