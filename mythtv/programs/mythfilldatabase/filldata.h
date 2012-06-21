@@ -76,6 +76,7 @@ public:
     bool InsertSDDataintoDatabase(Source source);
     int is_SDHeadendVersionUpdated(Source source);
     bool getSchedulesDirectStatusMessages(QString randhash);
+    int UpdateChannelTablefromSD(Source source);
 
     bool Run(SourceList &sourcelist);
     ChanInfo *xawtvChannel(QString &id, QString &channel, QString &fine);

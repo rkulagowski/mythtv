@@ -788,6 +788,136 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
     } // end of looking for a device match.
 }
 
+int FillData::UpdateChannelTablefromSD(Source source)
+// return a -1 for error, 0 for not updated, 1 for updated.
+{
+    QString lineup, device;
+
+    if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
+    {
+        // It's a postal code
+    }
+    else
+    {
+        lineup = source.lineupid.section(':', 0, 1);
+        device = source.lineupid.section(':', 1, -1);
+    }
+
+    if (device == "")
+    {
+        device = "Analog";
+    }
+
+    QString filename = "/tmp/" + lineup + ".txt";
+
+    QFile inputfile(filename);
+
+    if (!inputfile.open(QIODevice::ReadOnly))
+    {
+        qDebug() << "Couldn't open filename: " << filename;
+        QString status = "Failed to open filename " + filename;
+        return -1;
+    }
+
+    QByteArray lineupdata = inputfile.readAll();
+
+    QJson::Parser parser;
+    bool ok;
+    QVariantMap result = parser.parse(lineupdata, &ok).toMap();
+
+    if (!ok)
+    {
+        printf("line %d: %s\n", parser.errorLine(), parser.errorString().toUtf8().data());
+        return -1;
+    }
+
+
+    /* Get the existing sourceid
+    read the IL57303.txt file.
+
+    setup an update query that updates/creates chanid and inserts channum and xmltvid
+    parse through the "map" information for whichever device we're doing
+    update the chanid, channum and xmltvid
+    parse through the stationid information
+    update the name and callsign using the sourceid and xmltvid
+
+
+    */
+
+    // chanid has to be unique!
+
+    MSqlQuery insert(MSqlQuery::InitCon());
+    insert.prepare(
+        "INSERT INTO channel(chanid, channum, xmltvid, sourceid) VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID)"
+//       " ON DUPLICATE KEY UPDATE channum = :CHANNUM, xmltvid = :XMLTVID"
+    );
+
+
+    foreach(QVariant devtypes, result["DeviceTypes"].toList())
+    {
+        qDebug() << "device is" << devtypes.toString();
+        QVariantMap nestedLineupInfo = result[devtypes.toString()].toMap();
+
+        if (devtypes.toString() == device)
+        {
+            foreach(QVariant chanmap, nestedLineupInfo["map"].toList())
+            {
+                QVariantMap chan = chanmap.toMap();
+//                qDebug() << "channel:" << chan["channel"].toString();
+//                qDebug() << "stationid: " << chan["stationid"].toString();
+
+
+                int chanid = (source.id * 1000) + chan["channel"].toInt();
+                insert.bindValue(":CHANID", chanid);
+                insert.bindValue(":CHANNUM", chan["channel"].toString());
+                insert.bindValue(":XMLTVID", chan["stationid"].toString());
+                insert.bindValue(":SOURCEID", source.id);
+
+                if (!insert.exec())
+                {
+                    MythDB::DBError("Loading data", insert);
+                    return false;
+                }
+
+            }
+
+
+            MSqlQuery update(MSqlQuery::InitCon());
+
+            update.prepare(
+                "UPDATE channel SET callsign=:CALLSIGN, name=:NAME WHERE (sourceid=:SOURCEID AND xmltvid=:XMLTVID)"
+            );
+
+
+            foreach(QVariant chanmap, result["StationID"].toList())
+            {
+                QVariantMap chan = chanmap.toMap();
+                //qDebug() << "statid" <<  chan["stationid"].toString();
+                //qDebug() << "callsign" << chan["callsign"].toString();
+                //qDebug() << "url" << chan["url"].toString();
+
+                update.bindValue(":CALLSIGN", chan["callsign"].toString());
+                update.bindValue(":NAME", chan["callsign"].toString());
+                update.bindValue(":SOURCEID", source.id);
+                update.bindValue(":XMLTVID", chan["stationid"].toString());
+
+                if (!update.exec())
+                {
+                    MythDB::DBError("Loading data", insert);
+                    return false;
+                }
+
+
+            }
+
+
+        } // end of looking for a device match.
+
+
+    }
+}
+
+
 
 // Schedules Direct json-formatted data
 bool FillData::InsertSDDataintoDatabase(Source source)
@@ -862,6 +992,13 @@ bool FillData::InsertSDDataintoDatabase(Source source)
         bool ok;
 
         LOG(VB_GENERAL, LOG_INFO, QString("Parsing file: %1").arg(filename));
+
+        /*
+        * Create two QMaps: one holds schedule information.
+        * One holds program information
+        * The QMaps remain as json-encoded text strings.
+        * The prog_id is used as a key to access information from the QMap.
+        */
 
         QMap<QString, QString> schedule;
         QMap<QString, QString> program_information;
@@ -982,7 +1119,6 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
                 // Temp values
                 bool is_subtitled = false;
-
 
                 // Living dangerously, or speeding things up?
                 // Sanity check on whether the downloaded data is valid first?
@@ -1295,6 +1431,9 @@ bool FillData::Run(SourceList &sourcelist)
                 qDebug() << "Headend updated. Do something here; write a message to the log.";
             }
 
+            UpdateChannelTablefromSD(*it);
+
+
             if (!DownloadSDFiles(randhash, "schedule", *it))
             {
                 qDebug() << "Error downloading schedules.";
@@ -1312,6 +1451,7 @@ bool FillData::Run(SourceList &sourcelist)
                 qDebug() << "Error downloading lineup information.";
                 exit;
             }
+
 
             if (!InsertSDDataintoDatabase(*it))
             {
