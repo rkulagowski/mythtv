@@ -72,7 +72,7 @@ public:
                             const QString &lineupid, QDate *qCurrentDate = 0);
 
     QString GetSDLoginRandhash(Source source);
-    bool DownloadSDFiles(QString randhash, QString whattoget);
+    bool DownloadSDFiles(QString randhash, QString whattoget, Source source);
     bool InsertSDDataintoDatabase(Source source);
     int is_SDHeadendVersionUpdated(Source source);
     bool getSchedulesDirectStatusMessages(QString randhash);

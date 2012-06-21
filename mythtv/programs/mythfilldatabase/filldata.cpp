@@ -535,9 +535,6 @@ bool FillData::GrabDataFromDDFile(
 QString FillData::GetSDLoginRandhash(Source source)
 {
     QString randhash = "";
-    QString username, password;
-    username = source.userid;
-    password = source.password;
 
     QString loginurl = "http://10.244.23.50/schedulesdirect/login.php";
     //    QString loginurl = "http://rkulagow.schedulesdirect.org/schedulesdirect/login.php";
@@ -547,9 +544,9 @@ QString FillData::GetSDLoginRandhash(Source source)
 
     QByteArray tempdata, postdata;
     tempdata += "username=";
-    tempdata += username;
+    tempdata += source.userid;
     tempdata += "&password=";
-    tempdata += password;
+    tempdata += source.password;
     tempdata += "&submit=Log+In";
 
     postdata = tempdata.toPercentEncoding("&=+");
@@ -588,7 +585,7 @@ QString FillData::GetSDLoginRandhash(Source source)
 }
 
 // Schedules Direct download various files.
-bool FillData::DownloadSDFiles(QString randhash, QString whattoget)
+bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source source)
 {
 
     //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
@@ -647,10 +644,50 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget)
         }
 
         return true;
-    } // end of downloading schedules
+    } // end of downloading schedules or metadata
 
     if (whattoget == "lineup")
     {
+        QString lineup, device;
+
+        if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
+        {
+            // It's a postal code
+        }
+        else
+        {
+            lineup = source.lineupid.section(':', 0, 1);
+            device = source.lineupid.section(':', 1, -1);
+        }
+
+        if (device == "")
+        {
+            device = "Analog";
+        }
+
+        /*
+            * We don't specify the randhash because we don't need to. The lineup
+            * function at Schedules Direct is open so that it can be used by the QAM
+            * scanner.
+        */
+
+
+        url = urlbase + "?command=get&p1=lineup&p2=" + lineup;
+        GetMythDownloadManager()->download(url, &dl_file, false);
+        destfile = "/tmp/" + lineup + ".txt";
+
+        QFile file(destfile);
+
+        if (file.open(QIODevice::WriteOnly))
+        {
+            file.write(gUncompress(dl_file));
+            file.close();
+        }
+        else
+        {
+            LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not create file %1").arg(destfile));
+            return false;
+        }
     }
 
     if (whattoget == "status")
@@ -660,9 +697,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget)
         destfile = "/tmp/" + qdtNow.toLocalTime().toString(Qt::ISODate) + "-status.txt";
         GetMythDownloadManager()->download(url, destfile, false);
         return true;
-
     }
-
 }
 
 bool FillData::getSchedulesDirectStatusMessages(QString randhash)
@@ -686,9 +721,6 @@ bool FillData::getSchedulesDirectStatusMessages(QString randhash)
 int FillData::is_SDHeadendVersionUpdated(Source source)
 // return a -1 for error, 0 for not updated, 1 for updated.
 {
-    //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
-    QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
-
     QString lineup, device;
 
     if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
@@ -706,18 +738,23 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
         device = "Analog";
     }
 
-    QString destfile;
-    QByteArray lineupdata;
+    DownloadSDFiles("", "lineup", source);
 
-    /*
-    * We don't specify the randhash because we don't need to. The lineup
-    * function at Schedules Direct is open so that it can be used by the QAM
-    * scanner.
-    */
-    QString url = urlbase + "?command=get&p1=lineup&p2=" + lineup;
-    destfile = "/tmp/" + lineup + ".txt";
-    GetMythDownloadManager()->download(url, &lineupdata, false);
-    lineupdata = gUncompress(lineupdata);
+    QString filename = "/tmp/" + lineup + ".txt";
+
+    QFile inputfile(filename);
+
+    if (!inputfile.open(QIODevice::ReadOnly))
+    {
+        MSqlQuery startstopstatus_query(MSqlQuery::InitCon());
+
+        qDebug() << "Couldn't open filename: " << filename;
+        QString status = "Failed to open filename " + filename;
+        updateLastRunStatus(startstopstatus_query, status);
+        return -1;
+    }
+
+    QByteArray lineupdata = inputfile.readAll();
 
     QJson::Parser parser;
     bool ok;
@@ -735,7 +772,6 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
 
         if (devtypes.toString() == device)
         {
-
             if
             (
                 (nestedLineupInfo["version"].toInt() != source.version) ||
@@ -750,7 +786,6 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
             }
         }
     } // end of looking for a device match.
-
 }
 
 
@@ -1247,7 +1282,7 @@ bool FillData::Run(SourceList &sourcelist)
                         }
             */
 
-            DownloadSDFiles(randhash, "status");
+            DownloadSDFiles(randhash, "status", *it);
 
             int retval = is_SDHeadendVersionUpdated(*it);
 
@@ -1260,14 +1295,21 @@ bool FillData::Run(SourceList &sourcelist)
                 qDebug() << "Headend updated. Do something here; write a message to the log.";
             }
 
-            if (!DownloadSDFiles(randhash, "schedule"))
+            if (!DownloadSDFiles(randhash, "schedule", *it))
             {
                 qDebug() << "Error downloading schedules.";
                 exit;
             }
-            if (!DownloadSDFiles(randhash, "meta"))
+
+            if (!DownloadSDFiles(randhash, "meta", *it))
             {
                 qDebug() << "Error downloading metadata for channels.";
+                exit;
+            }
+
+            if (!DownloadSDFiles(randhash, "lineup", *it))
+            {
+                qDebug() << "Error downloading lineup information.";
                 exit;
             }
 
