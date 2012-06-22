@@ -602,7 +602,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
         MSqlQuery query(MSqlQuery::InitCon());
         query.prepare(
-            "SELECT distinct(xmltvid) FROM channel"
+            "SELECT distinct(xmltvid) FROM channel ORDER BY xmltvid ASC"
         );
 
         if (!query.exec())
@@ -682,6 +682,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
         {
             file.write(gUncompress(dl_file));
             file.close();
+            LOG(VB_GENERAL, LOG_INFO, QString("Downloaded file %1.txt").arg(lineup));
         }
         else
         {
@@ -698,6 +699,8 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
         GetMythDownloadManager()->download(url, destfile, false);
         return true;
     }
+
+return true;
 }
 
 bool FillData::getSchedulesDirectStatusMessages(QString randhash)
@@ -714,7 +717,6 @@ bool FillData::getSchedulesDirectStatusMessages(QString randhash)
     GetMythDownloadManager()->download(url, destfile, false);
     return true;
 }
-
 
 
 // Schedules Direct check for lineup update
@@ -778,6 +780,10 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
                 (nestedLineupInfo["modified"].toString() != source.modified)
             )
             {
+            LOG(VB_GENERAL, LOG_INFO, 
+            QString("Updated headend. Old version: %1 Old last modified: %2").arg(source.version).arg(source.modified));
+            LOG(VB_GENERAL, LOG_INFO, 
+            QString("Updated headend. New version: %1 New last modified: %2").arg(nestedLineupInfo["version"].toInt()).arg(nestedLineupInfo["modified"].toString()));
                 return 1;
             }
             else
@@ -786,12 +792,16 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
             }
         }
     } // end of looking for a device match.
+
+return 1;
 }
 
 int FillData::UpdateChannelTablefromSD(Source source)
 // return a -1 for error, 0 for not updated, 1 for updated.
 {
     QString lineup, device;
+    int new_version;
+    QString new_modified;
 
     if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
     {
@@ -832,40 +842,29 @@ int FillData::UpdateChannelTablefromSD(Source source)
     }
 
 
-    /* Get the existing sourceid
-    read the IL57303.txt file.
-
-    setup an update query that updates/creates chanid and inserts channum and xmltvid
-    parse through the "map" information for whichever device we're doing
-    update the chanid, channum and xmltvid
-    parse through the stationid information
-    update the name and callsign using the sourceid and xmltvid
-
-
-    */
-
-    // chanid has to be unique!
-
     MSqlQuery insert(MSqlQuery::InitCon());
     insert.prepare(
-"INSERT INTO channel(chanid, channum, xmltvid, sourceid) VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID) ON DUPLICATE KEY UPDATE channum = VALUES(channum), xmltvid=VALUES(xmltvid)"
+        "INSERT INTO channel(chanid, channum, xmltvid, sourceid) VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID) ON DUPLICATE KEY UPDATE channum = VALUES(channum), xmltvid=VALUES(xmltvid)"
     );
 
 
     foreach(QVariant devtypes, result["DeviceTypes"].toList())
     {
-//        qDebug() << "device is" << devtypes.toString();
+        //        qDebug() << "device is" << devtypes.toString();
         QVariantMap nestedLineupInfo = result[devtypes.toString()].toMap();
 
         if (devtypes.toString() == device)
         {
+            new_version = nestedLineupInfo["version"].toInt();
+            new_modified = nestedLineupInfo["modified"].toString();
+
+            qDebug() << "new version is " << new_version << "new modified is " << new_modified;
+
             foreach(QVariant chanmap, nestedLineupInfo["map"].toList())
             {
                 QVariantMap chan = chanmap.toMap();
-//                qDebug() << "channel:" << chan["channel"].toString();
-//                qDebug() << "stationid: " << chan["stationid"].toString();
-
-
+                //                qDebug() << "channel:" << chan["channel"].toString();
+                //                qDebug() << "stationid: " << chan["stationid"].toString();
                 int chanid = (source.id * 1000) + chan["channel"].toInt();
                 insert.bindValue(":CHANID", chanid);
                 insert.bindValue(":CHANNUM", chan["channel"].toString());
@@ -877,7 +876,6 @@ int FillData::UpdateChannelTablefromSD(Source source)
                     MythDB::DBError("Loading data", insert);
                     return -1;
                 }
-
             }
 
 
@@ -886,7 +884,6 @@ int FillData::UpdateChannelTablefromSD(Source source)
             update.prepare(
                 "UPDATE channel SET callsign=:CALLSIGN, name=:NAME WHERE (sourceid=:SOURCEID AND xmltvid=:XMLTVID)"
             );
-
 
             foreach(QVariant chanmap, result["StationID"].toList())
             {
@@ -905,20 +902,29 @@ int FillData::UpdateChannelTablefromSD(Source source)
                     MythDB::DBError("Loading data", insert);
                     return -1;
                 }
-
-
             }
+        } // end of updating the channel table which matches the devicetype
+    } //end of the outer json loop
 
+    // since we didn't return early, we must be done. Update the version and modified of this Source.
 
-        } // end of looking for a device match.
+    MSqlQuery update(MSqlQuery::InitCon());
+    update.prepare(
+        "UPDATE videosource SET version=:VERSION, modified=:MODIFIED WHERE sourceid=:SOURCEID"
+    );
 
+    update.bindValue(":VERSION", new_version);
+    update.bindValue(":MODIFIED", new_modified);
+    update.bindValue(":SOURCEID", source.id);
 
+    if (!update.exec())
+    {
+        MythDB::DBError("Loading data", insert);
+        return -1;
     }
 
-
-
+    return 1;
 }
-
 
 
 // Schedules Direct json-formatted data
@@ -961,8 +967,8 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
     updateLastRunStart(startstopstatus_query);
 
-    LOG(VB_GENERAL, LOG_INFO, "Reading schedule files.");
-    status = "Reading schedule files.";
+    LOG(VB_GENERAL, LOG_INFO, "Loading schedule files into database.");
+    status = "Loading schedule files into database.";
 
     updateLastRunStatus(startstopstatus_query, status);
 
@@ -993,7 +999,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
         QJson::Parser parser;
         bool ok;
 
-        LOG(VB_GENERAL, LOG_INFO, QString("Parsing file: %1").arg(filename));
+        LOG(VB_GENERAL, LOG_INFO, QString("Inserting file %1 into database.").arg(filename));
 
         /*
         * Create two QMaps: one holds schedule information.
@@ -1407,18 +1413,14 @@ bool FillData::Run(SourceList &sourcelist)
             */
             QString randhash = GetSDLoginRandhash(*it);
 
-            //qDebug() << "randhash is " << randhash;
             if (randhash == "error")
             {
-                qDebug() << "Error getting randhash.";
-                exit;
-            }
 
-            /*            if (getSchedulesDirectStatusMessages(randhash))
-                        {
-                            qDebug() << "Status message from Schedules Direct";
-                        }
-            */
+                fatalErrors.push_back("Failed to get randhash from Schedules Direct.");
+
+                LOG(VB_GENERAL, LOG_ERR, LOC + QString("Error determining if Schedules Direct headend has been updated."));
+                break;
+            }
 
             DownloadSDFiles(randhash, "status", *it);
 
@@ -1426,37 +1428,39 @@ bool FillData::Run(SourceList &sourcelist)
 
             if (retval == -1)
             {
-                qDebug() << "Error";
+                LOG(VB_GENERAL, LOG_ERR, LOC + QString("Error determining if Schedules Direct headend has been updated."));
+                fatalErrors.push_back("Error determining if Schedules Direct headend has been updated.");
+
+                break;
             }
             else if (retval == 1)
             {
-                qDebug() << "Headend updated. Do something here; write a message to the log.";
-            UpdateChannelTablefromSD(*it);
-
+                LOG(VB_GENERAL, LOG_INFO, QString("Headend has been updated. Refreshing channel table."));
+                UpdateChannelTablefromSD(*it);
             }
 
             if (!DownloadSDFiles(randhash, "schedule", *it))
             {
-                qDebug() << "Error downloading schedules.";
-                exit;
+                fatalErrors.push_back("Error downloading schedules from Schedules Direct.");
+                break;
             }
 
             if (!DownloadSDFiles(randhash, "meta", *it))
             {
-                qDebug() << "Error downloading metadata for channels.";
-                exit;
+                fatalErrors.push_back("Error downloading station metadata from Schedules Direct.");
+                break;
             }
 
             if (!DownloadSDFiles(randhash, "lineup", *it))
             {
-                qDebug() << "Error downloading lineup information.";
-                exit;
+                fatalErrors.push_back("Error downloading lineup information from Schedules Direct.");
+                break;
             }
-
 
             if (!InsertSDDataintoDatabase(*it))
             {
-                qDebug() << "Error inserting SD data.";
+                fatalErrors.push_back("Error inserting schedule from Schedules Direct.");
+                break;
             }
 
         } // Done with the schedulesdirect stuff.
