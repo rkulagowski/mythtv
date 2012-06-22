@@ -852,6 +852,9 @@ int FillData::UpdateChannelTablefromSD(Source source)
     );
 
 
+    //QMap<unsigned long int, unsigned int> qamfreq;
+    QHash<unsigned int, QAM> q;
+
     foreach(QVariant devtypes, result["DeviceTypes"].toList())
     {
         //        qDebug() << "device is" << devtypes.toString();
@@ -889,12 +892,24 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 "UPDATE channel SET callsign=:CALLSIGN, name=:NAME WHERE (sourceid=:SOURCEID AND xmltvid=:XMLTVID)"
             );
 
+
             foreach(QVariant chanmap, result["StationID"].toList())
             {
                 QVariantMap chan = chanmap.toMap();
                 //qDebug() << "statid" <<  chan["stationid"].toString();
                 //qDebug() << "callsign" << chan["callsign"].toString();
                 //qDebug() << "url" << chan["url"].toString();
+
+                QAM r;
+
+                if (chan["qam_frequency"].toString() != "")
+                {
+                    r.frequency = chan["qam_frequency"].toString();
+                    r.modulation = chan["qam_modulation"].toString().toLower();
+                    r.program = chan["qam_program"].toString();
+                    r.virtualchannel = chan["qam_virtualchannel"].toString();
+                    q.insert(chan["stationid"].toInt(), r);
+                }
 
                 update.bindValue(":CALLSIGN", chan["callsign"].toString());
                 update.bindValue(":NAME", chan["callsign"].toString());
@@ -903,10 +918,56 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
                 if (!update.exec())
                 {
-                    MythDB::DBError("Loading data", insert);
+                    MythDB::DBError("Loading data", update);
                     return -1;
                 }
             }
+
+
+            if (!q.isEmpty())
+            {
+                MSqlQuery deleteqam(MSqlQuery::InitCon());
+
+                deleteqam.prepare(
+                    "DELETE FROM dtv_multiplex WHERE sourceid=:SOURCEID"
+                );
+
+                deleteqam.bindValue(":SOURCEID", source.id);
+
+                if (!deleteqam.exec())
+                {
+                    MythDB::DBError("Loading data", deleteqam);
+                    return -1;
+                }
+
+
+                MSqlQuery updateqam(MSqlQuery::InitCon());
+
+                updateqam.prepare(
+                    "INSERT INTO dtv_multiplex(sourceid, frequency, modulation, constellation, sistandard) VALUES(:SOURCEID, :QAMFREQ, :MODULATION, :CONSTELLATION, :SISTANDARD)"
+                );
+
+                QHashIterator<unsigned int, QAM> i(q);
+                QAM r;
+
+                while (i.hasNext())
+                {
+                    i.next();
+                    r = i.value();
+//                    qDebug() << "stationid" << i.key() << "qamfreq " << r.frequency;
+                    updateqam.bindValue(":SOURCEID", source.id);
+                    updateqam.bindValue(":QAMFREQ", r.frequency);
+                    updateqam.bindValue(":MODULATION", r.modulation);
+                    updateqam.bindValue(":CONSTELLATION", r.modulation);
+                    updateqam.bindValue(":SISTANDARD", "atsc");
+
+                    if (!updateqam.exec())
+                    {
+                        MythDB::DBError("Loading data", updateqam);
+                        return -1;
+                    }
+                } // done iterating through all the qam tuples
+            } // if block done ("q" wasn't empty, so there was at least one qam entry
         } // end of updating the channel table which matches the devicetype
     } //end of the outer json loop
 
@@ -1440,6 +1501,13 @@ bool FillData::Run(SourceList &sourcelist)
                 LOG(VB_GENERAL, LOG_INFO, QString("Headend has been updated. Refreshing channel table."));
                 UpdateChannelTablefromSD(*it);
             }
+
+
+
+            UpdateChannelTablefromSD(*it); // Always run it for now for testing.
+
+
+
 
             if (!DownloadSDFiles(randhash, "schedule", *it))
             {

@@ -46,6 +46,15 @@ struct Source
 };
 typedef vector<Source> SourceList;
 
+struct QAM
+{
+    QAM(): frequency(), virtualchannel(), modulation(), program() {}
+    QString frequency;
+    QString virtualchannel;
+    QString modulation;
+    QString program;
+};
+
 class FillData
 {
 public:
