@@ -700,7 +700,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
         return true;
     }
 
-return true;
+    return true;
 }
 
 bool FillData::getSchedulesDirectStatusMessages(QString randhash)
@@ -780,10 +780,10 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
                 (nestedLineupInfo["modified"].toString() != source.modified)
             )
             {
-            LOG(VB_GENERAL, LOG_INFO, 
-            QString("Updated headend. Old version: %1 Old last modified: %2").arg(source.version).arg(source.modified));
-            LOG(VB_GENERAL, LOG_INFO, 
-            QString("Updated headend. New version: %1 New last modified: %2").arg(nestedLineupInfo["version"].toInt()).arg(nestedLineupInfo["modified"].toString()));
+                LOG(VB_GENERAL, LOG_INFO,
+                    QString("Updated headend. Old version: %1 Old last modified: %2").arg(source.version).arg(source.modified));
+                LOG(VB_GENERAL, LOG_INFO,
+                    QString("Updated headend. New version: %1 New last modified: %2").arg(nestedLineupInfo["version"].toInt()).arg(nestedLineupInfo["modified"].toString()));
                 return 1;
             }
             else
@@ -793,7 +793,7 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
         }
     } // end of looking for a device match.
 
-return 1;
+    return 1;
 }
 
 int FillData::UpdateChannelTablefromSD(Source source)
