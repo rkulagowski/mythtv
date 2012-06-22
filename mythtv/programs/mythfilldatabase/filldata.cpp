@@ -602,7 +602,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
         MSqlQuery query(MSqlQuery::InitCon());
         query.prepare(
-            "SELECT distinct(xmltvid) FROM channel ORDER BY xmltvid ASC"
+            "SELECT DISTINCT(xmltvid) FROM channel ORDER BY xmltvid ASC"
         );
 
         if (!query.exec())
@@ -610,6 +610,8 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
             MythDB::DBError("FillData::grabData", query);
             return false;
         }
+
+        LOG(VB_GENERAL, LOG_INFO, QString("%1 unique XMLIDs to download").arg(query.size()));
 
         while (query.next())
             // We're going to update all chanid's in the database that use this
@@ -635,6 +637,8 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
             {
                 file.write(gUncompress(dl_file));
                 file.close();
+                LOG(VB_GENERAL, LOG_INFO, QString("Downloaded file %1").arg(destfile));
+
             }
             else
             {
@@ -656,8 +660,8 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
         }
         else
         {
-            lineup = source.lineupid.section(':', 0, 1);
-            device = source.lineupid.section(':', 1, -1);
+            lineup = source.lineupid.section(':', 0, 0);
+            device = source.lineupid.section(':', 1, 1);
         }
 
         if (device == "")
@@ -1415,7 +1419,6 @@ bool FillData::Run(SourceList &sourcelist)
 
             if (randhash == "error")
             {
-
                 fatalErrors.push_back("Failed to get randhash from Schedules Direct.");
 
                 LOG(VB_GENERAL, LOG_ERR, LOC + QString("Error determining if Schedules Direct headend has been updated."));
@@ -1423,7 +1426,6 @@ bool FillData::Run(SourceList &sourcelist)
             }
 
             DownloadSDFiles(randhash, "status", *it);
-
             int retval = is_SDHeadendVersionUpdated(*it);
 
             if (retval == -1)
