@@ -729,8 +729,8 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
     }
     else
     {
-        lineup = source.lineupid.section(':', 0, 1);
-        device = source.lineupid.section(':', 1, -1);
+        lineup = source.lineupid.section(':', 0, 0);
+        device = source.lineupid.section(':', 1, 1);
     }
 
     if (device == "")
@@ -799,8 +799,8 @@ int FillData::UpdateChannelTablefromSD(Source source)
     }
     else
     {
-        lineup = source.lineupid.section(':', 0, 1);
-        device = source.lineupid.section(':', 1, -1);
+        lineup = source.lineupid.section(':', 0, 0);
+        device = source.lineupid.section(':', 1, 1);
     }
 
     if (device == "")
@@ -848,14 +848,13 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
     MSqlQuery insert(MSqlQuery::InitCon());
     insert.prepare(
-        "INSERT INTO channel(chanid, channum, xmltvid, sourceid) VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID)"
-//       " ON DUPLICATE KEY UPDATE channum = :CHANNUM, xmltvid = :XMLTVID"
+"INSERT INTO channel(chanid, channum, xmltvid, sourceid) VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID) ON DUPLICATE KEY UPDATE channum = VALUES(channum), xmltvid=VALUES(xmltvid)"
     );
 
 
     foreach(QVariant devtypes, result["DeviceTypes"].toList())
     {
-        qDebug() << "device is" << devtypes.toString();
+//        qDebug() << "device is" << devtypes.toString();
         QVariantMap nestedLineupInfo = result[devtypes.toString()].toMap();
 
         if (devtypes.toString() == device)
@@ -876,7 +875,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 if (!insert.exec())
                 {
                     MythDB::DBError("Loading data", insert);
-                    return false;
+                    return -1;
                 }
 
             }
@@ -904,7 +903,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 if (!update.exec())
                 {
                     MythDB::DBError("Loading data", insert);
-                    return false;
+                    return -1;
                 }
 
 
@@ -915,6 +914,9 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
 
     }
+
+
+
 }
 
 
@@ -1429,10 +1431,9 @@ bool FillData::Run(SourceList &sourcelist)
             else if (retval == 1)
             {
                 qDebug() << "Headend updated. Do something here; write a message to the log.";
-            }
-
             UpdateChannelTablefromSD(*it);
 
+            }
 
             if (!DownloadSDFiles(randhash, "schedule", *it))
             {
