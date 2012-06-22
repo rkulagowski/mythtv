@@ -46,11 +46,11 @@ SOURCES += service.cpp
 INCLUDEPATH += ./datacontracts
 INCLUDEPATH += ./services
 
-# needed only for enums
-INCLUDEPATH += ../libmyth
-INCLUDEPATH += ../libmythbase
+# needed only for enums in programtypes.h, recordingtypes.h
+DEPENDPATH += ../libmyth
+INCLUDEPATH += $$DEPENDPATH
 
-LIBS += -L../libmythbase -lmythbase-$$LIBVERSION $$EXTRA_LIBS
+LIBS += $$EXTRA_LIBS
 
 inc.path = $${PREFIX}/include/mythtv/libmythservicecontracts/
 inc.files = serviceexp.h service.h datacontracthelper.h
