@@ -845,14 +845,11 @@ int FillData::UpdateChannelTablefromSD(Source source)
         return -1;
     }
 
-
     MSqlQuery insert(MSqlQuery::InitCon());
     insert.prepare(
         "INSERT INTO channel(chanid, channum, xmltvid, sourceid) VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID) ON DUPLICATE KEY UPDATE channum = VALUES(channum), xmltvid=VALUES(xmltvid)"
     );
 
-
-    //QMap<unsigned long int, unsigned int> qamfreq;
     QHash<unsigned int, QAM> qamdata;
 
     foreach(QVariant devtypes, result["DeviceTypes"].toList())
@@ -926,6 +923,8 @@ int FillData::UpdateChannelTablefromSD(Source source)
             {
                 MSqlQuery updateqam(MSqlQuery::InitCon());
                 MSqlQuery is_have_QAM_in_database(MSqlQuery::InitCon());
+                MSqlQuery linkqam_to_mplexid(MSqlQuery::InitCon());
+                MSqlQuery setqamprogram(MSqlQuery::InitCon());
 
                 updateqam.prepare(
                     "INSERT INTO dtv_multiplex(sourceid, frequency, modulation, constellation, sistandard) VALUES(:SOURCEID, :QAMFREQ, :MODULATION, :CONSTELLATION, :SISTANDARD)"
@@ -934,6 +933,15 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 is_have_QAM_in_database.prepare(
                     "SELECT frequency FROM dtv_multiplex WHERE sourceid=:SOURCEID AND frequency=:QAMFREQ"
                 );
+
+                linkqam_to_mplexid.prepare(
+                    "UPDATE channel SET mplexid = (SELECT mplexid FROM dtv_multiplex WHERE frequency=:QAMFREQ) WHERE sourceid = :SOURCEID AND xmltvid = :XMLTVID"
+                );
+
+                setqamprogram.prepare(
+                    "UPDATE channel SET serviceid = :PROGRAM where xmltvid = :XMLTVID"
+                );
+
 
                 QHashIterator<unsigned int, QAM> i(qamdata);
                 QAM qamstruct;
@@ -966,8 +974,30 @@ int FillData::UpdateChannelTablefromSD(Source source)
                             return -1;
                         }
                     } // done adding the QAM data
+
+                    // link the channel information to a particular mplexid
+
+                    linkqam_to_mplexid.bindValue(":QAMFREQ", qamstruct.frequency);
+                    linkqam_to_mplexid.bindValue(":SOURCEID", source.id);
+                    linkqam_to_mplexid.bindValue(":XMLTVID", i.key());
+
+                    if (!linkqam_to_mplexid.exec())
+                    {
+                        MythDB::DBError("Loading data", linkqam_to_mplexid);
+                        return -1;
+                    }
+
+                    setqamprogram.bindValue(":PROGRAM", qamstruct.program);
+                    setqamprogram.bindValue(":XMLTVID", i.key());
+
+                    if (!setqamprogram.exec())
+                    {
+                        MythDB::DBError("Loading data", setqamprogram);
+                        return -1;
+                    }
                 } // done iterating through all the qam tuples
-            } // if block done ("q" wasn't empty, so there was at least one qam entry
+
+            } // if block done ("qamdata" wasn't empty, so there was at least one qam entry
         } // end of updating the channel table which matches the devicetype
     } //end of the outer json loop
 
