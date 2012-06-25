@@ -865,7 +865,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
             new_version = nestedLineupInfo["version"].toInt();
             new_modified = nestedLineupInfo["modified"].toString();
 
-//            qDebug() << "new version is " << new_version << "new modified is " << new_modified;
+            //            qDebug() << "new version is " << new_version << "new modified is " << new_modified;
 
             foreach(QVariant chanmap, nestedLineupInfo["map"].toList())
             {
@@ -924,25 +924,15 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
             if (!qamdata.isEmpty())
             {
-                MSqlQuery deleteqam(MSqlQuery::InitCon());
-
-                deleteqam.prepare(
-                    "DELETE FROM dtv_multiplex WHERE sourceid=:SOURCEID"
-                );
-
-                deleteqam.bindValue(":SOURCEID", source.id);
-
-                if (!deleteqam.exec())
-                {
-                    MythDB::DBError("Loading data", deleteqam);
-                    return -1;
-                }
-
-
                 MSqlQuery updateqam(MSqlQuery::InitCon());
+                MSqlQuery is_have_QAM_in_database(MSqlQuery::InitCon());
 
                 updateqam.prepare(
                     "INSERT INTO dtv_multiplex(sourceid, frequency, modulation, constellation, sistandard) VALUES(:SOURCEID, :QAMFREQ, :MODULATION, :CONSTELLATION, :SISTANDARD)"
+                );
+
+                is_have_QAM_in_database.prepare(
+                    "SELECT frequency FROM dtv_multiplex WHERE sourceid=:SOURCEID AND frequency=:QAMFREQ"
                 );
 
                 QHashIterator<unsigned int, QAM> i(qamdata);
@@ -952,18 +942,30 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 {
                     i.next();
                     qamstruct = i.value();
-//                    qDebug() << "stationid" << i.key() << "qamfreq " << qamstruct.frequency;
-                    updateqam.bindValue(":SOURCEID", source.id);
-                    updateqam.bindValue(":QAMFREQ", qamstruct.frequency);
-                    updateqam.bindValue(":MODULATION", qamstruct.modulation);
-                    updateqam.bindValue(":CONSTELLATION", qamstruct.modulation);
-                    updateqam.bindValue(":SISTANDARD", "atsc");
+                    //                    qDebug() << "stationid" << i.key() << "qamfreq " << qamstruct.frequency;
+                    is_have_QAM_in_database.bindValue(":SOURCEID", source.id);
+                    is_have_QAM_in_database.bindValue(":QAMFREQ", qamstruct.frequency);
 
-                    if (!updateqam.exec())
+                    if (!is_have_QAM_in_database.exec())
                     {
-                        MythDB::DBError("Loading data", updateqam);
+                        MythDB::DBError("Loading data", is_have_QAM_in_database);
                         return -1;
                     }
+
+                    if (is_have_QAM_in_database.size() == 0) // The QAM data wasn't already in the table, so add it.
+                    {
+                        updateqam.bindValue(":SOURCEID", source.id);
+                        updateqam.bindValue(":QAMFREQ", qamstruct.frequency);
+                        updateqam.bindValue(":MODULATION", qamstruct.modulation);
+                        updateqam.bindValue(":CONSTELLATION", qamstruct.modulation);
+                        updateqam.bindValue(":SISTANDARD", "atsc");
+
+                        if (!updateqam.exec())
+                        {
+                            MythDB::DBError("Loading data", updateqam);
+                            return -1;
+                        }
+                    } // done adding the QAM data
                 } // done iterating through all the qam tuples
             } // if block done ("q" wasn't empty, so there was at least one qam entry
         } // end of updating the channel table which matches the devicetype
