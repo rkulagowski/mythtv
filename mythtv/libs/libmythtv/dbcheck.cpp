@@ -2248,8 +2248,13 @@ NULL
         const char *updates[] = {
 "ALTER TABLE videosource ADD COLUMN version INTEGER UNSIGNED NOT NULL DEFAULT '0';",
 "ALTER TABLE videosource ADD COLUMN modified DATE DEFAULT '0000-00-00';",
-"ALTER TABLE program ADD season SMALLINT(5) NOT NULL AFTER description;",
-"ALTER TABLE program ADD episode SMALLINT(5) NOT NULL AFTER season;",
+"ALTER TABLE program ADD season SMALLINT(5) AFTER description;",
+"ALTER TABLE program ADD episode SMALLINT(5) AFTER season;",
+"ALTER TABLE programrating ADD adultsituations boolean;",
+"ALTER TABLE programrating ADD violence boolean;",
+"ALTER TABLE programrating ADD language boolean;",
+"ALTER TABLE programrating ADD dialog boolean;",
+"ALTER TABLE programrating ADD fantasyviolence boolean;",
 NULL
 };
         if (!performActualUpdate(updates, "1306", dbver))
@@ -2885,6 +2890,8 @@ bool InitializeMythSchema(void)
 "  title varchar(128) NOT NULL DEFAULT '',"
 "  subtitle varchar(128) NOT NULL DEFAULT '',"
 "  description varchar(16000) NOT NULL DEFAULT '',"
+"  season smallint(5),"
+"  episode smallint(5),"
 "  category varchar(64) NOT NULL DEFAULT '',"
 "  category_type varchar(64) NOT NULL DEFAULT '',"
 "  airdate year(4) NOT NULL DEFAULT '0000',"
@@ -2937,6 +2944,11 @@ bool InitializeMythSchema(void)
 "  starttime datetime NOT NULL DEFAULT '0000-00-00 00:00:00',"
 "  system varchar(8) DEFAULT NULL,"
 "  rating varchar(16) DEFAULT NULL,"
+"  adultsituation boolean,"
+"  violence boolean,"
+"  language boolean,"
+"  dialog boolean,"
+"  fantasyviolence,"
 "  UNIQUE KEY chanid (chanid,starttime,system,rating),"
 "  KEY starttime (starttime,system)"
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",

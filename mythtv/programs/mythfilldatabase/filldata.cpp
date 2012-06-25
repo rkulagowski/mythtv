@@ -804,7 +804,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
 // return a -1 for error, 0 for not updated, 1 for updated.
 {
     QString lineup, device;
-    int new_version;
+    int new_version = 0; // Not really, but quiets a warning.
     QString new_modified;
 
     if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
@@ -1024,15 +1024,14 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
 // Schedules Direct json-formatted data
 bool FillData::InsertSDDataintoDatabase(Source source)
-//    int id, const QString &lineupid)
 {
     // Information relating to schedules
     QString lineupid = source.lineupid;
 
     bool subject_to_blackout, educational, time_approximate;
     bool joined_in_progress, left_in_progress;
-    bool sex_rating, dialog_rating, tv_rating, violence_rating;
-    bool fv_rating, lang_rating;
+    bool adultsituations, dialog_rating, violence_rating;
+    bool fantasy_violencerating, lang_rating;
     bool is_cc, is_stereo, dolby;
     bool cable_in_the_classroom;
     bool is_new, is_enhanced, is_3d, is_hdtv, is_letterboxed, has_dvs;
@@ -1040,7 +1039,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
     QString live_tape_delay;
     QString is_premiere_or_finale;
     QString sched_prog_id;
-    QString air_date, air_time;
+    QString air_date, air_time, tv_rating;
     QString season, episode;
     int duration, part_num, num_parts;
 
@@ -1161,12 +1160,12 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             time_approximate = result["time_approximate"].toBool();
             joined_in_progress = result["joined_in_progress"].toBool();
             left_in_progress = result["left_in_progress"].toBool();
-            sex_rating = result["sex_rating"].toBool();
-            dialog_rating = result["dialog_rating"].toBool();
-            tv_rating = result["tv_rating"].toBool();
+            adultsituations = result["sex_rating"].toBool();
             violence_rating = result["violence_rating"].toBool();
-            fv_rating = result["fv_rating"].toBool();
             lang_rating = result["lang_rating"].toBool();
+            dialog_rating = result["dialog_rating"].toBool();
+            fantasy_violencerating = result["fv_rating"].toBool();
+            tv_rating = result["tv_rating"].toString(); // "TV-Y", "TV-14", etc.
             is_cc = result["cc"].toBool();
             is_stereo = result["stereo"].toBool();
             dolby = result["dolby"].toBool();
@@ -1214,6 +1213,27 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
             int chanid;
 
+            MSqlQuery insert_program(MSqlQuery::InitCon());
+            MSqlQuery insert_rating(MSqlQuery::InitCon());
+
+            insert_program.prepare(
+                "INSERT INTO program ("
+                "chanid, starttime, endtime,"
+                "title, subtitle, description,"
+                "season, episode, stereo, subtitled, hdtv,"
+                "closecaptioned, partnumber, parttotal,"
+                "seriesid, originalairdate, programid) "
+                "VALUES ("
+                ":CHANID, :STARTTIME, :ENDTIME,"
+                ":TITLE, :SUBTITLE, :DESCRIPTION,"
+                ":SEASON, :EPISODE, :STEREO, :SUBTITLED, :HDTV,"
+                ":CLOSECAPTIONED, :PARTNUMBER, :PARTTOTAL,"
+                ":SERIESID, :ORIGINALAIRDATE, :PROGID)");
+
+            insert_rating.prepare(
+                "INSERT programrating(chanid, starttime, system, rating, adultsituations, violence, language, dialog, fantasyviolence) VALUES(:CHANID,:STARTTIME,:SYSTEM,:RATING,:ADULT,:VIOLENCE,:LANGUAGE,:DIALOG,:FV) ON DUPLICATE KEY UPDATE system=VALUES(system), rating=VALUES(rating), adultsituations=VALUES(adultsituations), violence=VALUES(violence), language=VALUES(language), dialog=VALUES(dialog), fantasyviolence=VALUES(fantasyviolence)"
+            );
+
             if (query.next())
                 // We're going to update all chanid's in the database that use this particular XMLID.
             {
@@ -1239,46 +1259,60 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                     return false;
                 }
 
-                MSqlQuery insert(MSqlQuery::InitCon());
-                insert.prepare(
-                    "INSERT INTO program ("
-                    "chanid, starttime, endtime,"
-                    "title, subtitle, description,"
-                    "season, episode, stereo, subtitled, hdtv,"
-                    "closecaptioned, partnumber, parttotal,"
-                    "seriesid, originalairdate, programid) "
-                    "VALUES ("
-                    ":CHANID, :STARTTIME, :ENDTIME,"
-                    ":TITLE, :SUBTITLE, :DESCRIPTION,"
-                    ":SEASON, :EPISODE, :STEREO, :SUBTITLED, :HDTV,"
-                    ":CLOSECAPTIONED, :PARTNUMBER, :PARTTOTAL,"
-                    ":SERIESID, :ORIGINALAIRDATE, :PROGID)");
+                insert_program.bindValue(":CHANID", chanid);
+                insert_program.bindValue(":STARTTIME", UTCdt_start);
+                insert_program.bindValue(":ENDTIME", UTCdt_end);
+                insert_program.bindValue(":TITLE", title);
+                insert_program.bindValue(":SUBTITLE", epi_title);
+                insert_program.bindValue(":DESCRIPTION", descr);
+                insert_program.bindValue(":SEASON", season);
+                insert_program.bindValue(":EPISODE", episode);
+                insert_program.bindValue(":STEREO", is_stereo);
+                insert_program.bindValue(":SUBTITLED", is_subtitled);
+                insert_program.bindValue(":HDTV", is_hdtv);
+                insert_program.bindValue(":CLOSECAPTIONED", is_cc);
+                insert_program.bindValue(":PARTNUMBER", part_num);
+                insert_program.bindValue(":PARTTOTAL", num_parts);
+                insert_program.bindValue(":SERIESID", syn_epi_num);
+                insert_program.bindValue(":ORIGINALAIRDATE", orig_air_date);
+                insert_program.bindValue(":PROGID", i.key());
 
-                insert.bindValue(":CHANID", chanid);
-                insert.bindValue(":STARTTIME", UTCdt_start);
-                insert.bindValue(":ENDTIME", UTCdt_end);
-                insert.bindValue(":TITLE", title);
-                insert.bindValue(":SUBTITLE", epi_title);
-                insert.bindValue(":DESCRIPTION", descr);
-                insert.bindValue(":SEASON", season);
-                insert.bindValue(":EPISODE", episode);
-                insert.bindValue(":STEREO", is_stereo);
-                insert.bindValue(":SUBTITLED", is_subtitled);
-                insert.bindValue(":HDTV", is_hdtv);
-                insert.bindValue(":CLOSECAPTIONED", is_cc);
-                insert.bindValue(":PARTNUMBER", part_num);
-                insert.bindValue(":PARTTOTAL", num_parts);
-                insert.bindValue(":SERIESID", syn_epi_num);
-                insert.bindValue(":ORIGINALAIRDATE", orig_air_date);
-                insert.bindValue(":PROGID", i.key());
+                insert_rating.bindValue(":CHANID", chanid);
+                insert_rating.bindValue(":STARTTIME", UTCdt_start);
 
-                if (!insert.exec())
+                // qDebug() << "progid: " << i.key() << "tv_rating: " << tv_rating;
+
+                if (i.key().left(2) == "MV")
                 {
-                    MythDB::DBError("Loading data", insert);
+                    insert_rating.bindValue(":SYSTEM", "MPAA");
+                }
+                else if (tv_rating != "")
+                {
+                    insert_rating.bindValue(":SYSTEM", "VCHIP");
+                }
+
+                insert_rating.bindValue(":RATING", tv_rating);
+                insert_rating.bindValue(":ADULT", adultsituations);
+                insert_rating.bindValue(":VIOLENCE", violence_rating);
+                insert_rating.bindValue(":LANGUAGE", lang_rating);
+                insert_rating.bindValue(":DIALOG", dialog_rating);
+                insert_rating.bindValue(":FV", fantasy_violencerating);
+
+                if (!insert_program.exec())
+                {
+                    MythDB::DBError("Loading data", insert_program);
+                    return false;
+                }
+
+                if (!insert_rating.exec())
+                {
+                    MythDB::DBError("Loading data", insert_rating);
                     return false;
                 }
             }
         } // end of the while loop
+
+        // Put in a delay parameter to avoid swamping slower systems?
     } // end of iterating through all the files.
 
     updateLastRunEnd(startstopstatus_query);
@@ -1502,7 +1536,9 @@ bool FillData::Run(SourceList &sourcelist)
             * Execute a login to http://rkulagow.schedulesdirect.org/login.php
             * Scan the downloaded file for the randhash.
             * Download status messages
-            * Check the version number of the headend
+            * Compare our version number and modified of the headend with what was
+            * downloaded from Schedules Direct. If they're different, then the headend
+            * has been updated, so get the new headend.
             *
             *
             */
@@ -1532,12 +1568,13 @@ bool FillData::Run(SourceList &sourcelist)
                 UpdateChannelTablefromSD(*it);
             }
 
-
-
-            UpdateChannelTablefromSD(*it); // Always run it for now for testing.
-
-
-
+            // Not needed anymore? If the lineup is new,
+            if (!DownloadSDFiles(randhash, "lineup", *it))
+            {
+                // The lineup is the map of channel numbers to XMLIDs in a particular headend.
+                fatalErrors.push_back("Error downloading lineup information from Schedules Direct.");
+                break;
+            }
 
             if (!DownloadSDFiles(randhash, "schedule", *it))
             {
@@ -1547,13 +1584,8 @@ bool FillData::Run(SourceList &sourcelist)
 
             if (!DownloadSDFiles(randhash, "meta", *it))
             {
+                // Meta data is things like callsign.
                 fatalErrors.push_back("Error downloading station metadata from Schedules Direct.");
-                break;
-            }
-
-            if (!DownloadSDFiles(randhash, "lineup", *it))
-            {
-                fatalErrors.push_back("Error downloading lineup information from Schedules Direct.");
                 break;
             }
 
@@ -1563,7 +1595,7 @@ bool FillData::Run(SourceList &sourcelist)
                 break;
             }
 
-        } // Done with the schedulesdirect stuff.
+        } // Done with the Schedules Direct JSON-import routine.
 
         if (is_grabber_datadirect(xmltv_grabber) && dd_grab_all)
         {
