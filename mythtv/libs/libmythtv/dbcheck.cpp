@@ -2248,6 +2248,8 @@ NULL
         const char *updates[] = {
 "ALTER TABLE videosource ADD COLUMN version INTEGER UNSIGNED NOT NULL DEFAULT '0';",
 "ALTER TABLE videosource ADD COLUMN modified DATE DEFAULT '0000-00-00';",
+"ALTER TABLE program ADD season SMALLINT(5) NOT NULL AFTER description;",
+"ALTER TABLE program ADD episode SMALLINT(5) NOT NULL AFTER season;",
 NULL
 };
         if (!performActualUpdate(updates, "1306", dbver))

@@ -1244,13 +1244,13 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                     "INSERT INTO program ("
                     "chanid, starttime, endtime,"
                     "title, subtitle, description,"
-                    "stereo, subtitled, hdtv,"
+                    "season, episode, stereo, subtitled, hdtv,"
                     "closecaptioned, partnumber, parttotal,"
                     "seriesid, originalairdate, programid) "
                     "VALUES ("
                     ":CHANID, :STARTTIME, :ENDTIME,"
                     ":TITLE, :SUBTITLE, :DESCRIPTION,"
-                    ":STEREO, :SUBTITLED, :HDTV,"
+                    ":SEASON, :EPISODE, :STEREO, :SUBTITLED, :HDTV,"
                     ":CLOSECAPTIONED, :PARTNUMBER, :PARTTOTAL,"
                     ":SERIESID, :ORIGINALAIRDATE, :PROGID)");
 
@@ -1260,6 +1260,8 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 insert.bindValue(":TITLE", title);
                 insert.bindValue(":SUBTITLE", epi_title);
                 insert.bindValue(":DESCRIPTION", descr);
+                insert.bindValue(":SEASON", season);
+                insert.bindValue(":EPISODE", episode);
                 insert.bindValue(":STEREO", is_stereo);
                 insert.bindValue(":SUBTITLED", is_subtitled);
                 insert.bindValue(":HDTV", is_hdtv);
@@ -1285,8 +1287,6 @@ bool FillData::InsertSDDataintoDatabase(Source source)
     updateLastRunStatus(startstopstatus_query, status);
 
     return true;
-
-    //    return GrabData(s, offset, currentd);
 }
 
 
