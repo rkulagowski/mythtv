@@ -2243,16 +2243,16 @@ NULL
     return true;
 
 /* One day this will get commited, but for now do it manually.
-*    if (dbver == "1305")
-*    {
-*        const char *updates[] = {
-*"ALTER TABLE videosource ADD COLUMN version INTEGER UNSIGNED NOT NULL DEFAULT '0';",
-*"ALTER TABLE videosource ADD COLUMN modified DATE DEFAULT '0000-00-00';",
-*NULL
-*};
-*        if (!performActualUpdate(updates, "1306", dbver))
-*            return false;
-*    }
+    if (dbver == "1305")
+    {
+        const char *updates[] = {
+"ALTER TABLE videosource ADD COLUMN version INTEGER UNSIGNED NOT NULL DEFAULT '0';",
+"ALTER TABLE videosource ADD COLUMN modified DATE DEFAULT '0000-00-00';",
+NULL
+};
+        if (!performActualUpdate(updates, "1306", dbver))
+            return false;
+    }
 */
 }
 
