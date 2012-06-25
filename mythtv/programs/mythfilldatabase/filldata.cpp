@@ -853,7 +853,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
 
     //QMap<unsigned long int, unsigned int> qamfreq;
-    QHash<unsigned int, QAM> q;
+    QHash<unsigned int, QAM> qamdata;
 
     foreach(QVariant devtypes, result["DeviceTypes"].toList())
     {
@@ -865,7 +865,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
             new_version = nestedLineupInfo["version"].toInt();
             new_modified = nestedLineupInfo["modified"].toString();
 
-            qDebug() << "new version is " << new_version << "new modified is " << new_modified;
+//            qDebug() << "new version is " << new_version << "new modified is " << new_modified;
 
             foreach(QVariant chanmap, nestedLineupInfo["map"].toList())
             {
@@ -885,7 +885,6 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 }
             }
 
-
             MSqlQuery update(MSqlQuery::InitCon());
 
             update.prepare(
@@ -900,15 +899,15 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 //qDebug() << "callsign" << chan["callsign"].toString();
                 //qDebug() << "url" << chan["url"].toString();
 
-                QAM r;
+                QAM qamstruct;
 
                 if (chan["qam_frequency"].toString() != "")
                 {
-                    r.frequency = chan["qam_frequency"].toString();
-                    r.modulation = chan["qam_modulation"].toString().toLower();
-                    r.program = chan["qam_program"].toString();
-                    r.virtualchannel = chan["qam_virtualchannel"].toString();
-                    q.insert(chan["stationid"].toInt(), r);
+                    qamstruct.frequency = chan["qam_frequency"].toString();
+                    qamstruct.modulation = chan["qam_modulation"].toString().toLower();
+                    qamstruct.program = chan["qam_program"].toString();
+                    qamstruct.virtualchannel = chan["qam_virtualchannel"].toString();
+                    qamdata.insert(chan["stationid"].toInt(), qamstruct);
                 }
 
                 update.bindValue(":CALLSIGN", chan["callsign"].toString());
@@ -923,8 +922,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 }
             }
 
-
-            if (!q.isEmpty())
+            if (!qamdata.isEmpty())
             {
                 MSqlQuery deleteqam(MSqlQuery::InitCon());
 
@@ -947,18 +945,18 @@ int FillData::UpdateChannelTablefromSD(Source source)
                     "INSERT INTO dtv_multiplex(sourceid, frequency, modulation, constellation, sistandard) VALUES(:SOURCEID, :QAMFREQ, :MODULATION, :CONSTELLATION, :SISTANDARD)"
                 );
 
-                QHashIterator<unsigned int, QAM> i(q);
-                QAM r;
+                QHashIterator<unsigned int, QAM> i(qamdata);
+                QAM qamstruct;
 
                 while (i.hasNext())
                 {
                     i.next();
-                    r = i.value();
-//                    qDebug() << "stationid" << i.key() << "qamfreq " << r.frequency;
+                    qamstruct = i.value();
+//                    qDebug() << "stationid" << i.key() << "qamfreq " << qamstruct.frequency;
                     updateqam.bindValue(":SOURCEID", source.id);
-                    updateqam.bindValue(":QAMFREQ", r.frequency);
-                    updateqam.bindValue(":MODULATION", r.modulation);
-                    updateqam.bindValue(":CONSTELLATION", r.modulation);
+                    updateqam.bindValue(":QAMFREQ", qamstruct.frequency);
+                    updateqam.bindValue(":MODULATION", qamstruct.modulation);
+                    updateqam.bindValue(":CONSTELLATION", qamstruct.modulation);
                     updateqam.bindValue(":SISTANDARD", "atsc");
 
                     if (!updateqam.exec())
@@ -984,7 +982,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
     if (!update.exec())
     {
-        MythDB::DBError("Loading data", insert);
+        MythDB::DBError("Loading data", update);
         return -1;
     }
 
