@@ -850,7 +850,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
         "INSERT INTO channel(chanid, channum, xmltvid, sourceid) VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID) ON DUPLICATE KEY UPDATE channum = VALUES(channum), xmltvid=VALUES(xmltvid)"
     );
 
-    QHash<unsigned int, QAM> qamdata;
+    QHash<unsigned int, QAM> qamdataHash;
 
     foreach(QVariant devtypes, result["DeviceTypes"].toList())
     {
@@ -904,7 +904,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
                     qamstruct.modulation = chan["qam_modulation"].toString().toLower();
                     qamstruct.program = chan["qam_program"].toString();
                     qamstruct.virtualchannel = chan["qam_virtualchannel"].toString();
-                    qamdata.insert(chan["stationid"].toInt(), qamstruct);
+                    qamdataHash.insert(chan["stationid"].toInt(), qamstruct);
                 }
 
                 update.bindValue(":CALLSIGN", chan["callsign"].toString());
@@ -919,7 +919,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 }
             }
 
-            if (!qamdata.isEmpty())
+            if (!qamdataHash.isEmpty())
             {
                 MSqlQuery updateqam(MSqlQuery::InitCon());
                 MSqlQuery is_have_QAM_in_database(MSqlQuery::InitCon());
@@ -943,7 +943,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 );
 
 
-                QHashIterator<unsigned int, QAM> i(qamdata);
+                QHashIterator<unsigned int, QAM> i(qamdataHash);
                 QAM qamstruct;
 
                 while (i.hasNext())
