@@ -847,7 +847,9 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
     MSqlQuery insert(MSqlQuery::InitCon());
     insert.prepare(
-        "INSERT INTO channel(chanid, channum, xmltvid, sourceid) VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID) ON DUPLICATE KEY UPDATE channum = VALUES(channum), xmltvid=VALUES(xmltvid)"
+        "INSERT INTO channel(chanid, channum, xmltvid, sourceid) "
+        "VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID) "
+        "ON DUPLICATE KEY UPDATE channum = VALUES(channum), xmltvid=VALUES(xmltvid)"
     );
 
     QHash<unsigned int, QAM> qamdataHash;
@@ -927,7 +929,8 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 MSqlQuery setqamprogram(MSqlQuery::InitCon());
 
                 updateqam.prepare(
-                    "INSERT INTO dtv_multiplex(sourceid, frequency, modulation, constellation, sistandard) VALUES(:SOURCEID, :QAMFREQ, :MODULATION, :CONSTELLATION, :SISTANDARD)"
+                    "INSERT INTO dtv_multiplex(sourceid, frequency, modulation, constellation, sistandard) "
+                    "VALUES(:SOURCEID, :QAMFREQ, :MODULATION, :CONSTELLATION, :SISTANDARD)"
                 );
 
                 is_have_QAM_in_database.prepare(
@@ -935,7 +938,8 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 );
 
                 linkqam_to_mplexid.prepare(
-                    "UPDATE channel SET mplexid = (SELECT mplexid FROM dtv_multiplex WHERE frequency=:QAMFREQ) WHERE sourceid = :SOURCEID AND xmltvid = :XMLTVID"
+                    "UPDATE channel SET mplexid = (SELECT mplexid FROM dtv_multiplex WHERE frequency=:QAMFREQ) "
+                    "WHERE sourceid = :SOURCEID AND xmltvid = :XMLTVID"
                 );
 
                 setqamprogram.prepare(
@@ -1075,6 +1079,11 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
     QStringListIterator j(files);
 
+    MSqlQuery insert_people_names(MSqlQuery::InitCon());
+    insert_people_names.prepare(
+        "INSERT IGNORE INTO people(name) VALUE(:NAME)"
+    );
+
     while (j.hasNext())
     {
 
@@ -1138,7 +1147,6 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             i.next();
             // qDebug() << i.key() << ": " << i.value();
 
-
             QVariantMap result = parser.parse(i.value().toLocal8Bit(), &ok).toMap();
 
             if (!ok)
@@ -1198,6 +1206,17 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             syn_epi_num = prog_info["syn_epi_num"].toString();
             orig_air_date = prog_info["orig_air_date"].toString();
 
+            QStringList cast_and_crew;
+
+            QVariant castcrew;
+
+            foreach(castcrew, prog_info["cast_and_crew"].toList())
+            {
+                // We use an insert ignore in the prepare so that we don't need to worry about duplicate names.
+                insert_people_names.bindValue(":NAME", castcrew.toString().section(":", 1, 1));
+                insert_people_names.exec();
+            }
+
             MSqlQuery query(MSqlQuery::InitCon());
             query.prepare(
                 "SELECT chanid FROM channel WHERE xmltvid = :XMLID"
@@ -1212,9 +1231,12 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             }
 
             int chanid;
+            int person;
 
             MSqlQuery insert_program(MSqlQuery::InitCon());
             MSqlQuery insert_rating(MSqlQuery::InitCon());
+            MSqlQuery link_credits_to_program(MSqlQuery::InitCon());
+            MSqlQuery get_person_id(MSqlQuery::InitCon());
 
             insert_program.prepare(
                 "INSERT INTO program ("
@@ -1231,7 +1253,18 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 ":SERIESID, :ORIGINALAIRDATE, :PROGID)");
 
             insert_rating.prepare(
-                "INSERT programrating(chanid, starttime, system, rating, adultsituations, violence, language, dialog, fantasyviolence) VALUES(:CHANID,:STARTTIME,:SYSTEM,:RATING,:ADULT,:VIOLENCE,:LANGUAGE,:DIALOG,:FV) ON DUPLICATE KEY UPDATE system=VALUES(system), rating=VALUES(rating), adultsituations=VALUES(adultsituations), violence=VALUES(violence), language=VALUES(language), dialog=VALUES(dialog), fantasyviolence=VALUES(fantasyviolence)"
+                "INSERT programrating(chanid, starttime, system, rating, adultsituations, violence, language, dialog, fantasyviolence) "
+                "VALUES(:CHANID,:STARTTIME,:SYSTEM,:RATING,:ADULT,:VIOLENCE,:LANGUAGE,:DIALOG,:FV) "
+                "ON DUPLICATE KEY UPDATE system=VALUES(system), rating=VALUES(rating), adultsituations=VALUES(adultsituations), "
+                "violence=VALUES(violence), language=VALUES(language), dialog=VALUES(dialog), fantasyviolence=VALUES(fantasyviolence)"
+            );
+
+            get_person_id.prepare(
+                "SELECT person FROM people WHERE name = :NAME"
+            );
+
+            link_credits_to_program.prepare(
+                "INSERT INTO credits(person, chanid, starttime, role) VALUES (:PERSON, :CHANID, :STARTTIME, :ROLE)"
             );
 
             if (query.next())
@@ -1309,6 +1342,28 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                     MythDB::DBError("Loading data", insert_rating);
                     return false;
                 }
+
+                foreach(castcrew, prog_info["cast_and_crew"].toList())
+                {
+                    get_person_id.bindValue(":NAME", castcrew.toString().section(":", 1, 1));
+                    get_person_id.exec();
+                    get_person_id.next();
+                    person = get_person_id.value(0).toInt();
+
+                    link_credits_to_program.bindValue(":ROLE", castcrew.toString().section(":", 0, 0));
+                    link_credits_to_program.bindValue(":CHANID", chanid);
+                    link_credits_to_program.bindValue(":STARTTIME", UTCdt_start);
+                    link_credits_to_program.bindValue(":PERSON", person);
+
+                    if (!link_credits_to_program.exec())
+                    {
+                        MythDB::DBError("Loading data", link_credits_to_program);
+                        return false;
+                    }
+
+                }
+
+
             }
         } // end of the while loop
 
