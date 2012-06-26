@@ -2256,7 +2256,7 @@ NULL
 "ALTER TABLE programrating ADD dialog boolean;",
 "ALTER TABLE programrating ADD fantasyviolence boolean;",
 "ALTER TABLE credits DROP COLUMN role;",
-"ALTER TABLE credits ADD COLUMN role varchar(30)",
+"ALTER TABLE credits ADD COLUMN role varchar(30);",
 NULL
 };
         if (!performActualUpdate(updates, "1306", dbver))
@@ -2483,7 +2483,7 @@ bool InitializeMythSchema(void)
 "  person mediumint(8) unsigned NOT NULL DEFAULT '0',"
 "  chanid int(10) unsigned NOT NULL DEFAULT '0',"
 "  starttime datetime NOT NULL DEFAULT '0000-00-00 00:00:00',"
-"  role varchar(30) DEFAULT '',"
+"  role set('actor','director','producer','executive_producer','writer','guest_star','host','adapter','presenter','commentator','guest') NOT NULL DEFAULT '',"
 "  UNIQUE KEY chanid (chanid,starttime,person,role),"
 "  KEY person (person,role)"
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
