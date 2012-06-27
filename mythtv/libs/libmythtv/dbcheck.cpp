@@ -2263,7 +2263,15 @@ NULL
 "message VARCHAR(30) NOT NULL DEFAULT '',",
 "PRIMARY KEY (chanid, starttime, message),",
 "KEY message(message)",
-") ENGINE=MyISAM DEFAULT CHARSET=utf8;"
+") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
+"CREATE TABLE programholiday(",
+"chanid INT(10) UNSIGNED NOT NULL DEFAULT '0',",
+"starttime DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',",
+"holiday VARCHAR(30) NOT NULL DEFAULT '',",
+"PRIMARY KEY (chanid, starttime, holiday),",
+"KEY holiday(holiday)",
+") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
+
 NULL
 };
         if (!performActualUpdate(updates, "1306", dbver))

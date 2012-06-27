@@ -1053,6 +1053,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
     QString descr, reduced_descr1, reduced_descr2, reduced_descr3, descr_500;
     QString descr2, descr2_reduced;
     QString descr_lang_id;
+    QString holiday;
     QString source_type, show_type;
     QString syn_epi_num, alt_syn_epi_num;
     QString color_code;
@@ -1205,6 +1206,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             descr = prog_info["descr"].toString();
             syn_epi_num = prog_info["syn_epi_num"].toString();
             orig_air_date = prog_info["orig_air_date"].toString();
+            holiday = prog_info["holiday_id"].toString();
 
             QVariant castcrew;
 
@@ -1237,6 +1239,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             MSqlQuery get_person_id(MSqlQuery::InitCon());
             MSqlQuery link_genres_to_program(MSqlQuery::InitCon());
             MSqlQuery link_advisories_to_program(MSqlQuery::InitCon());
+            MSqlQuery link_holiday_to_program(MSqlQuery::InitCon());
 
             insert_program.prepare(
                 "INSERT INTO program ("
@@ -1277,6 +1280,10 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 "VALUES (:CHANID, :STARTTIME, :MESSAGE)"
             );
 
+            link_holiday_to_program.prepare(
+                "INSERT IGNORE INTO programholiday(chanid, starttime, holiday) "
+                "VALUES (:CHANID, :STARTTIME, :HOLIDAY)"
+            );
 
             if (query.next())
                 // We're going to update all chanid's in the database that use this particular XMLID.
@@ -1402,8 +1409,22 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                         MythDB::DBError("Loading data", link_advisories_to_program);
                         return false;
                     }
-
                 } // done inserting advisories
+
+
+                if (!holiday.isEmpty())
+                {
+                    link_holiday_to_program.bindValue(":CHANID", chanid);
+                    link_holiday_to_program.bindValue(":STARTTIME", UTCdt_start);
+                    link_holiday_to_program.bindValue(":HOLIDAY", holiday);
+
+                    if (!link_holiday_to_program.exec())
+                    {
+                        MythDB::DBError("Loading data", link_holiday_to_program);
+                        return false;
+                    }
+                } // done inserting holiday
+
 
             }
         } // end of the while loop
