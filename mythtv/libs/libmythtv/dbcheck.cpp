@@ -2257,6 +2257,13 @@ NULL
 "ALTER TABLE programrating ADD fantasyviolence boolean;",
 "ALTER TABLE credits DROP COLUMN role;",
 "ALTER TABLE credits ADD COLUMN role varchar(30);",
+"CREATE TABLE programadvisories(",
+"chanid INT(10) UNSIGNED NOT NULL DEFAULT '0',",
+"starttime DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',",
+"message VARCHAR(30) NOT NULL DEFAULT '',",
+"PRIMARY KEY (chanid, starttime, message),",
+"KEY message(message)",
+") ENGINE=MyISAM DEFAULT CHARSET=utf8;"
 NULL
 };
         if (!performActualUpdate(updates, "1306", dbver))
