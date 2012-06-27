@@ -1206,8 +1206,6 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             syn_epi_num = prog_info["syn_epi_num"].toString();
             orig_air_date = prog_info["orig_air_date"].toString();
 
-            QStringList cast_and_crew;
-
             QVariant castcrew;
 
             foreach(castcrew, prog_info["cast_and_crew"].toList())
@@ -1237,6 +1235,8 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             MSqlQuery insert_rating(MSqlQuery::InitCon());
             MSqlQuery link_credits_to_program(MSqlQuery::InitCon());
             MSqlQuery get_person_id(MSqlQuery::InitCon());
+            MSqlQuery link_genres_to_program(MSqlQuery::InitCon());
+            MSqlQuery link_advisories_to_program(MSqlQuery::InitCon());
 
             insert_program.prepare(
                 "INSERT INTO program ("
@@ -1264,8 +1264,19 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             );
 
             link_credits_to_program.prepare(
-                "INSERT INTO credits(person, chanid, starttime, role) VALUES (:PERSON, :CHANID, :STARTTIME, :ROLE)"
+                "INSERT IGNORE INTO credits(person, chanid, starttime, role) VALUES (:PERSON, :CHANID, :STARTTIME, :ROLE)"
             );
+
+            link_genres_to_program.prepare(
+                "INSERT IGNORE INTO programgenres(chanid, starttime, relevance, genre) "
+                "VALUES (:CHANID, :STARTTIME, :RELEVANCE, :PERSON)"
+            );
+
+            link_advisories_to_program.prepare(
+                "INSERT IGNORE INTO programadvisories(chanid, starttime, message) "
+                "VALUES (:CHANID, :STARTTIME, :MESSAGE)"
+            );
+
 
             if (query.next())
                 // We're going to update all chanid's in the database that use this particular XMLID.
@@ -1360,9 +1371,39 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                         MythDB::DBError("Loading data", link_credits_to_program);
                         return false;
                     }
+                } // done inserting cast and crew information.
 
-                }
+                int relevance = 0;
 
+                foreach(QVariant genre, prog_info["genres"].toList())
+                {
+                    link_genres_to_program.bindValue(":CHANID", chanid);
+                    link_genres_to_program.bindValue(":STARTTIME", UTCdt_start);
+                    link_genres_to_program.bindValue(":RELEVANCE", relevance);
+                    link_genres_to_program.bindValue(":PERSON", genre.toString());
+
+                    if (!link_genres_to_program.exec())
+                    {
+                        MythDB::DBError("Loading data", link_genres_to_program);
+                        return false;
+                    }
+
+                    relevance++; // From Tribune, relevance just seems to be a counter; there's no ordering of relevance information in the raw data from TMS.
+                } // done inserting genres
+
+                foreach(QVariant message, prog_info["advisories"].toList())
+                {
+                    link_advisories_to_program.bindValue(":CHANID", chanid);
+                    link_advisories_to_program.bindValue(":STARTTIME", UTCdt_start);
+                    link_advisories_to_program.bindValue(":MESSAGE", message.toString());
+
+                    if (!link_advisories_to_program.exec())
+                    {
+                        MythDB::DBError("Loading data", link_advisories_to_program);
+                        return false;
+                    }
+
+                } // done inserting advisories
 
             }
         } // end of the while loop
