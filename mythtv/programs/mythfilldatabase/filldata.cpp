@@ -1032,19 +1032,21 @@ bool FillData::InsertSDDataintoDatabase(Source source)
     // Information relating to schedules
     QString lineupid = source.lineupid;
 
-    bool subject_to_blackout, educational, time_approximate;
+    bool subject_to_blackout, is_educational, time_approximate;
     bool joined_in_progress, left_in_progress;
     bool adultsituations, dialog_rating, violence_rating;
     bool fantasy_violencerating, lang_rating;
-    bool is_cc, is_stereo, dolby;
+    bool is_cc, is_stereo;
     bool cable_in_the_classroom;
     bool is_new, is_enhanced, is_3d, is_hdtv, is_letterboxed, has_dvs;
+    bool is_dubbed, is_sap, is_subtitled, is_premiere, is_finale;
     QString network_syndicated_source, network_syndicated_type;
-    QString live_tape_delay;
-    QString is_premiere_or_finale;
+    QString live_tape_delay, dolby;
+    QString premiere_finale;
     QString sched_prog_id;
     QString air_date, air_time, tv_rating;
     QString season, episode;
+    QString dubbed_language, sap_language, subtitled_language;
     int duration, part_num, num_parts;
 
     // Information relating to programs.
@@ -1165,7 +1167,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             num_parts = result["num_parts"].toInt();
 
             subject_to_blackout = result["subject_to_blackout"].toBool();
-            educational = result["educational"].toBool();
+            is_educational = result["educational"].toBool();
             time_approximate = result["time_approximate"].toBool();
             joined_in_progress = result["joined_in_progress"].toBool();
             left_in_progress = result["left_in_progress"].toBool();
@@ -1177,17 +1179,40 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             tv_rating = result["tv_rating"].toString(); // "TV-Y", "TV-14", etc.
             is_cc = result["cc"].toBool();
             is_stereo = result["stereo"].toBool();
-            dolby = result["dolby"].toBool();
+            dolby = result["dolby"].toString();
             cable_in_the_classroom = result["cable_in_the_classroom"].toBool();
             is_new = result["new"].toBool();
             is_enhanced = result["enhanced"].toBool();
             is_3d = result["3d"].toBool();
             is_hdtv = result["hdtv"].toBool();
             is_letterboxed = result["letterbox"].toBool();
+            is_sap =  result["sap"].toBool();
+            sap_language = result["sap_language"].toString();
+            is_dubbed =  result["dubbed"].toBool();
+            dubbed_language = result["dubbed_language"].toString();
+            is_subtitled = result["subtitled"].toBool();
+            subtitled_language = result["subtitled_language"].toString();
+            premiere_finale = result["premiere_finale"].toString();
+            has_dvs = result["dvs"].toBool();
+
+            if (premiere_finale != "")
+            {
+                if (premiere_finale.contains("premiere", Qt::CaseInsensitive))
+                {
+                    is_premiere = true;
+                }
+
+                if (premiere_finale.contains("finale", Qt::CaseInsensitive))
+                {
+                    is_finale = true;
+                }
+            }
+
+
             network_syndicated_source = result["net_syn_source"].toString();
             network_syndicated_type = result["net_syn_type"].toString();
             live_tape_delay = result["live_tape_delay"].toString();
-            is_premiere_or_finale = result["premiere_finale"].toString();
+            premiere_finale = result["premiere_finale"].toString();
 
             QDateTime UTCdt_start = QDateTime::fromString(air_date + " " + air_time, Qt::ISODate);
             QDateTime UTCdt_end = UTCdt_start.addSecs(duration);
@@ -1250,13 +1275,20 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 "seriesid, originalairdate, programid, "
                 "first, last, 3d, letterbox, dvs, "
                 "dubbed, dubbed_language, educational, "
-                "sap, sap_language, subtitled, subtitled_language) "
+                "sap, sap_language, subtitled, subtitled_language, new, "
+                "subject_to_blackout, time_approximate, joined_in_progress, "
+                "left_in_progress, cable_in_the_classroom, enhanced, dolby) "
                 "VALUES ("
                 ":CHANID, :STARTTIME, :ENDTIME,"
                 ":TITLE, :SUBTITLE, :DESCRIPTION,"
-                ":SEASON, :EPISODE, :STEREO, :SUBTITLED, :HDTV,"
+                ":SEASON, :EPISODE, :STEREO, :HDTV,"
                 ":CLOSECAPTIONED, :PARTNUMBER, :PARTTOTAL,"
-                ":SERIESID, :ORIGINALAIRDATE, :PROGID)");
+                ":SERIESID, :ORIGINALAIRDATE, :PROGID,"
+                ":FIRST, :LAST, :3D, :LETTERBOX, :DVS,"
+                ":DUBBED, :DUBBED_LANGUAGE, :EDUCATIONAL,"
+                ":SAP, :SAP_LANGUAGE, :SUBTITLED, :SUBTITLED_LANGUAGE, :IS_NEW,"
+                ":SUBJECT_TO_BLACKOUT, :TIME_APPROXIMATE, :JOINED_IN_PROGRESS,"
+                ":LEFT_IN_PROGRESS, :CABLE_IN_THE_CLASSROOM, :ENHANCED, :DOLBY)");
 
             insert_rating.prepare(
                 "INSERT programrating(chanid, starttime, system, rating, adultsituations, violence, language, dialog, fantasyviolence) "
@@ -1294,9 +1326,6 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
                 chanid = query.value(0).toInt();
 
-                // Temp values
-                bool is_subtitled = false;
-
                 // Living dangerously, or speeding things up?
                 // Sanity check on whether the downloaded data is valid first?
 
@@ -1322,7 +1351,6 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 insert_program.bindValue(":SEASON", season);
                 insert_program.bindValue(":EPISODE", episode);
                 insert_program.bindValue(":STEREO", is_stereo);
-                insert_program.bindValue(":SUBTITLED", is_subtitled);
                 insert_program.bindValue(":HDTV", is_hdtv);
                 insert_program.bindValue(":CLOSECAPTIONED", is_cc);
                 insert_program.bindValue(":PARTNUMBER", part_num);
@@ -1330,6 +1358,27 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 insert_program.bindValue(":SERIESID", syn_epi_num);
                 insert_program.bindValue(":ORIGINALAIRDATE", orig_air_date);
                 insert_program.bindValue(":PROGID", i.key());
+                insert_program.bindValue(":FIRST", is_premiere);
+                insert_program.bindValue(":LAST", is_finale);
+                insert_program.bindValue(":3D", is_3d);
+                insert_program.bindValue(":LETTERBOX", is_letterboxed);
+                insert_program.bindValue(":DVS", "");
+                insert_program.bindValue(":DUBBED", is_dubbed);
+                insert_program.bindValue(":DUBBED_LANGUAGE", dubbed_language);
+                insert_program.bindValue(":EDUCATIONAL", is_educational);
+                insert_program.bindValue(":SAP", is_sap);
+                insert_program.bindValue(":SAP_LANGUAGE", sap_language);
+                insert_program.bindValue(":SUBTITLED", is_subtitled);
+                insert_program.bindValue(":SUBTITLED_LANGUAGE", subtitled_language);
+                insert_program.bindValue(":NEW", is_new);
+                insert_program.bindValue(":SUBJECT_TO_BLACKOUT", subject_to_blackout);
+                insert_program.bindValue(":TIME_APPROXIMATE", time_approximate);
+                insert_program.bindValue(":JOINED_IN_PROGRESS", joined_in_progress);
+                insert_program.bindValue(":LEFT_IN_PROGRESS", left_in_progress);
+                insert_program.bindValue(":CABLE_IN_THE_CLASSROOM", cable_in_the_classroom);
+                insert_program.bindValue(":ENHANCED", is_enhanced);
+                insert_program.bindValue(":DVS", has_dvs);
+                insert_program.bindValue(":DOLBY", dolby);
 
                 insert_rating.bindValue(":CHANID", chanid);
                 insert_rating.bindValue(":STARTTIME", UTCdt_start);
