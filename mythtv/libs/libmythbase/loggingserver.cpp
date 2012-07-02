@@ -63,6 +63,7 @@ LogForwardThread                   *logForwardThread = NULL;
 static QMutex                       logThreadStartedMutex;
 static QWaitCondition               logThreadStarted;
 static bool                         logThreadFinished = false;
+static bool                         logThreadStarting = false;
 
 typedef QList<LoggerBase *> LoggerList;
 
@@ -583,8 +584,6 @@ bool DatabaseLogger::logqmsg(MSqlQuery &query, LoggingItem *item)
         return false;
     }
 
-    item->DecrRef();
-
     return true;
 }
 
@@ -793,6 +792,7 @@ void LogServerThread::run(void)
     ctx->setInterval(100);
     ctx->start();
 
+    bool abortThread = false;
     try
     {
         m_zmqInSock = m_zmqContext->createSocket(nzmqt::ZMQSocket::TYP_ROUTER);
@@ -806,43 +806,64 @@ void LogServerThread::run(void)
     {
         LOG(VB_GENERAL, LOG_ERR, QString("Exception during socket setup: %1")
             .arg(e.what()));
-        qApp->quit();
+        abortThread = true;
     }
 
+    if (!abortThread)
+    {
+        logForwardThread = new LogForwardThread();
+        logForwardThread->start();
 
-    logForwardThread = new LogForwardThread();
-    logForwardThread->start();
+        connect(logForwardThread, SIGNAL(pingClient(QString)),
+                this, SLOT(pingClient(QString)), Qt::QueuedConnection);
 
-    connect(logForwardThread, SIGNAL(pingClient(QString)),
-            this, SLOT(pingClient(QString)), Qt::QueuedConnection);
+        // cerr << "wake all" << endl;
+        locker.unlock();
+        logThreadStarted.wakeAll();
+        // cerr << "unlock" << endl;
 
-    // cerr << "wake all" << endl;
-    locker.unlock();
-    logThreadStarted.wakeAll();
-    // cerr << "unlock" << endl;
- 
-    msgsSinceHeartbeat = 0;
-    m_heartbeatTimer = new MythSignalingTimer(this, SLOT(checkHeartBeats()));
-    m_heartbeatTimer->start(1000);
+        msgsSinceHeartbeat = 0;
+        m_heartbeatTimer = new MythSignalingTimer(this,
+                                                  SLOT(checkHeartBeats()));
+        m_heartbeatTimer->start(1000);
 
-    exec();
+        exec();
+    }
 
     logThreadFinished = true;
 
-    m_heartbeatTimer->stop();
-    delete m_heartbeatTimer;
+    if (m_heartbeatTimer)
+    {
+        m_heartbeatTimer->stop();
+        delete m_heartbeatTimer;
+    }
 
-    m_zmqInSock->setLinger(0);
-    m_zmqInSock->close();
+    if (m_zmqInSock)
+    {
+        m_zmqInSock->setLinger(0);
+        m_zmqInSock->close();
+    }
 
     if (logForwardThread)
+    {
         logForwardThread->stop();
-    delete logForwardThread;
-    logForwardThread = NULL;
+        delete logForwardThread;
+        logForwardThread = NULL;
+    }
 
     delete m_zmqContext;
+    m_zmqContext = NULL;
 
     RunEpilog();
+
+    if (abortThread)
+    {
+        // cerr << "wake all" << endl;
+        locker.unlock();
+        logThreadStarted.wakeAll();
+        qApp->processEvents();
+        // cerr << "unlock" << endl;
+    }
 }
 
 /// \brief  Sends a ping message to the given client
@@ -913,17 +934,6 @@ void LogServerThread::stop(void)
     quit();
 }
 
-static QAtomicInt item_count;
-static QAtomicInt malloc_count;
-
-#define DEBUG_MEMORY 0
-#if DEBUG_MEMORY
-static int max_count = 0;
-static QTime memory_time;
-#endif
-
-
-
 /// \brief  Entry point to start logging for the application.  This will
 ///         start up all of the threads needed.
 /// \param  logfile Filename of the logfile to create.  Empty if no file.
@@ -936,13 +946,16 @@ static QTime memory_time;
 /// \param  dblog       true if database logging is requested
 /// \param  propagate   true if the logfile path needs to be propagated to child
 ///                     processes.
-void logServerStart(void)
+/// \return TRUE on success, FALSE on failure
+bool logServerStart(void)
 {
     if (logServerThread && logServerThread->isRunning())
-        return;
+        return true;
 
     if (!logServerThread)
         logServerThread = new LogServerThread();
+
+    logThreadStarting = true;
 
     // cerr << "starting server" << endl;
     QMutexLocker locker(&logThreadStartedMutex);
@@ -950,6 +963,9 @@ void logServerStart(void)
     logThreadStarted.wait(locker.mutex());
     locker.unlock();
     // cerr << "done starting server" << endl;
+
+    usleep(10000);
+    return (logServerThread && logServerThread->isRunning());
 }
 
 /// \brief  Entry point for stopping logging for an application
@@ -973,7 +989,9 @@ void logServerWait(void)
 {
     // cerr << "waiting" << endl;
     QMutexLocker locker(&logThreadStartedMutex);
-    logThreadStarted.wait(locker.mutex());
+    while ((!logThreadStarting ||
+            (logServerThread && logServerThread->isRunning())) &&
+           !logThreadStarted.wait(locker.mutex(), 100));
     locker.unlock();
     // cerr << "done waiting" << endl;
 }

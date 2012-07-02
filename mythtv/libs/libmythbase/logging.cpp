@@ -251,7 +251,8 @@ LoggerThread::LoggerThread(QString filename, bool progress, bool quiet,
     MThread("Logger"),
     m_waitNotEmpty(new QWaitCondition()),
     m_waitEmpty(new QWaitCondition()),
-    m_aborted(false), m_filename(filename), m_progress(progress),
+    m_aborted(false), m_initialWaiting(true),
+    m_filename(filename), m_progress(progress),
     m_quiet(quiet), m_appname(QCoreApplication::applicationName()),
     m_tablename(table), m_facility(facility), m_pid(getpid()),
     m_zmqContext(NULL), m_zmqSocket(NULL), m_initialTimer(NULL), 
@@ -260,8 +261,8 @@ LoggerThread::LoggerThread(QString filename, bool progress, bool quiet,
     char *debug = getenv("VERBOSE_THREADS");
     if (debug != NULL)
     {
-//        LOG(VB_GENERAL, LOG_NOTICE,
-//            "Logging thread registration/deregistration enabled!");
+        LOG(VB_GENERAL, LOG_NOTICE,
+            "Logging thread registration/deregistration enabled!");
         debugRegistration = true;
     }
     m_locallogs = (m_appname == MYTH_APPNAME_MYTHLOGSERVER);
@@ -303,6 +304,7 @@ void LoggerThread::run(void)
 
     LOG(VB_GENERAL, LOG_INFO, "Added logging to the console");
 
+    bool dieNow = false;
     try
     {
         if (m_locallogs)
@@ -316,41 +318,55 @@ void LoggerThread::run(void)
             m_zmqContext->start();
         }
 
-        qRegisterMetaType<QList<QByteArray> >("QList<QByteArray>");
-
-        m_zmqSocket = m_zmqContext->createSocket(nzmqt::ZMQSocket::TYP_DEALER,
-                                                 this);
-        connect(m_zmqSocket, SIGNAL(messageReceived(const QList<QByteArray>&)),
-                SLOT(messageReceived(const QList<QByteArray>&)),
-                Qt::QueuedConnection);
-
-        if (m_locallogs)
-            m_zmqSocket->connectTo("inproc://mylogs");
+        if (!m_zmqContext)
+        {
+            m_aborted = true;
+            dieNow = true;
+        }
         else
-            m_zmqSocket->connectTo("tcp://127.0.0.1:35327");
+        {
+            qRegisterMetaType<QList<QByteArray> >("QList<QByteArray>");
+
+            m_zmqSocket =
+                m_zmqContext->createSocket(nzmqt::ZMQSocket::TYP_DEALER, this);
+            connect(m_zmqSocket,
+                    SIGNAL(messageReceived(const QList<QByteArray>&)),
+                    SLOT(messageReceived(const QList<QByteArray>&)),
+                    Qt::QueuedConnection);
+
+            if (m_locallogs)
+                m_zmqSocket->connectTo("inproc://mylogs");
+            else
+                m_zmqSocket->connectTo("tcp://127.0.0.1:35327");
+        }
     }
     catch (nzmqt::ZMQException &e)
     {
         cerr << "Exception during logging socket setup: " << e.what() << endl;
-        qApp->quit();
+        m_aborted = true;
+        dieNow = true;
     }
 
-    if (!m_locallogs)
+    if (!m_aborted)
     {
-        m_initialWaiting = true;
-        pingLogServer();
+        if (!m_locallogs)
+        {
+            m_initialWaiting = true;
+            pingLogServer();
 
-        // wait up to 150ms for mythlogserver to respond
-        m_initialTimer = new MythSignalingTimer(this, SLOT(initialTimeout()));
-        m_initialTimer->start(150);
+            // wait up to 150ms for mythlogserver to respond
+            m_initialTimer = new MythSignalingTimer(this,
+                                                    SLOT(initialTimeout()));
+            m_initialTimer->start(150);
+        }
+        else
+            LOG(VB_GENERAL, LOG_INFO, "Added logging to mythlogserver locally");
+
+        loggingGetTimeStamp(&m_epoch, NULL);
+        
+        m_heartbeatTimer = new MythSignalingTimer(this, SLOT(checkHeartBeat()));
+        m_heartbeatTimer->start(1000);
     }
-    else
-        LOG(VB_GENERAL, LOG_INFO, "Added logging to mythlogserver locally");
-
-    loggingGetTimeStamp(&m_epoch, NULL);
-    
-    m_heartbeatTimer = new MythSignalingTimer(this, SLOT(checkHeartBeat()));
-    m_heartbeatTimer->start(1000);
 
     QMutexLocker qLock(&logQueueMutex);
 
@@ -379,23 +395,34 @@ void LoggerThread::run(void)
         qLock.relock();
     }
 
+    qLock.unlock();
+
     // This must be before the timer stop below or we deadlock when the timer
     // thread tries to deregister, and we wait for it.
     logThreadFinished = true;
 
-    m_heartbeatTimer->stop();
-    delete m_heartbeatTimer;
-    m_heartbeatTimer = NULL;
+    if (m_heartbeatTimer)
+    {
+        m_heartbeatTimer->stop();
+        delete m_heartbeatTimer;
+        m_heartbeatTimer = NULL;
+    }
 
-    m_zmqSocket->setLinger(0);
-    m_zmqSocket->close();
+    if (m_zmqSocket)
+    {
+        m_zmqSocket->setLinger(0);
+        m_zmqSocket->close();
+    }
 
     if (!m_locallogs)
         delete m_zmqContext;
 
-    qLock.unlock();
-
     RunEpilog();
+
+    if (dieNow)
+    {
+        qApp->processEvents();
+    }
 }
 
 /// \brief  Handles the initial startup timeout when waiting for the log server
@@ -423,6 +450,7 @@ void LoggerThread::initialTimeout(void)
 ///         heard from for at least 5s, restart it
 void LoggerThread::checkHeartBeat(void)
 {
+    static bool launched = false;
     qlonglong epoch;
 
     loggingGetTimeStamp(&epoch, NULL);
@@ -430,7 +458,15 @@ void LoggerThread::checkHeartBeat(void)
 
     if (age == 5)
     {
-        launchLogServer();
+        if (!launched)
+        {
+            launchLogServer();
+            launched = true;
+        }
+    }
+    else
+    {
+        launched = false;
     }
 }
 
@@ -541,7 +577,7 @@ void LoggerThread::handleItem(LoggingItem *item)
     if (item->m_message[0] != '\0')
     {
         // Send it to mythlogserver
-        if (!logThreadFinished)
+        if (!logThreadFinished && m_zmqSocket)
             m_zmqSocket->sendMessage(item->toByteArray());
     }
 }
@@ -686,8 +722,6 @@ void LogPrintLine( uint64_t mask, LogLevel_t level, const char *file, int line,
 {
     va_list         arguments;
 
-    QMutexLocker qLock(&logQueueMutex);
-
     int type = kMessage;
     type |= (mask & VB_FLUSH) ? kFlush : 0;
     type |= (mask & VB_STDIO) ? kStandardIO : 0;
@@ -711,6 +745,8 @@ void LogPrintLine( uint64_t mask, LogLevel_t level, const char *file, int line,
 
     if (formatcopy)
         free(formatcopy);
+
+    QMutexLocker qLock(&logQueueMutex);
 
     logQueue.enqueue(item);
 
@@ -814,7 +850,6 @@ void logStart(QString logfile, int progress, int quiet, int facility,
 
     QString table = dblog ? QString("logging") : QString("");
 
-    QMutexLocker qLock(&logQueueMutex);
     if (!logThread)
         logThread = new LoggerThread(logfile, progress, quiet, table, facility);
 
