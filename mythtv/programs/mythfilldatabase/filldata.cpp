@@ -739,7 +739,13 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
         device = source.lineupid.section(':', 1, 1);
     }
 
-    if (device == "")
+    QString a = lineup.left(3);
+
+    if (a == "DIS" || a == "DIT" || a == "ECH" || a == "4DT" || a == "C-B")
+    {
+        device = "Satellite";
+    }
+    else if (device == "")
     {
         device = "Analog";
     }
@@ -817,7 +823,13 @@ int FillData::UpdateChannelTablefromSD(Source source)
         device = source.lineupid.section(':', 1, 1);
     }
 
-    if (device == "")
+    QString a = lineup.left(3);
+
+    if (a == "DIS" || a == "DIT" || a == "ECH" || a == "4DT" || a == "C-B")
+    {
+        device = "Satellite";
+    }
+    else if (device == "")
     {
         device = "Analog";
     }
