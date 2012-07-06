@@ -16,10 +16,8 @@ using namespace std;
 #include <QList>
 #include <QMap>
 #include <QDir>
-//#include <QJson>
 #include <QVariant>
 #include <QDebug>
-#include <qjson/parser.h>
 
 // MythTV headers
 #include "mythmiscutil.h"
@@ -602,7 +600,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
         MSqlQuery query(MSqlQuery::InitCon());
         query.prepare(
-            "SELECT DISTINCT(xmltvid) FROM channel ORDER BY xmltvid ASC"
+            "SELECT DISTINCT(xmltvid) FROM channel WHERE visible=1 ORDER BY xmltvid ASC"
         );
 
         if (!query.exec())
