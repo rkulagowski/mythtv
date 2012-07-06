@@ -13,9 +13,8 @@ INSTALLS = target
 
 QMAKE_CLEAN += $(TARGET)
 
-INCLUDEPATH += ../../libs/libmythtv/mpeg /usr/include/qjson
+INCLUDEPATH += ../../libs/libmythtv/mpeg
 DEPENDPATH  += ../../libs/libmythtv/mpeg
-LIBS += -lqjson
 
 
 # Input
