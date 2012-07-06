@@ -16,10 +16,8 @@ using namespace std;
 #include <QList>
 #include <QMap>
 #include <QDir>
-//#include <QJson>
 #include <QVariant>
 #include <QDebug>
-#include <qjson/parser.h>
 
 // MythTV headers
 #include "mythmiscutil.h"
@@ -39,6 +37,9 @@ using namespace std;
 
 // fillutil header
 #include "fillutil.h" // for uncompress routine
+
+// QJson routines.
+#include "QJson/Parser"
 
 #define LOC QString("FillData: ")
 #define LOC_WARN QString("FillData, Warning: ")
@@ -741,7 +742,7 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
 
     QString a = lineup.left(3);
 
-    if (a == "DIS" || a == "DIT" || a == "ECH" || a == "4DT" || a == "C-B")
+    if (a == "DIS" || a == "DIT" || a == "ECH" || a == "4DT" || a == "C-B" || a == "AFN" || a == "GLO" || a == "SKY")
     {
         device = "Satellite";
     }
@@ -825,7 +826,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
     QString a = lineup.left(3);
 
-    if (a == "DIS" || a == "DIT" || a == "ECH" || a == "4DT" || a == "C-B")
+    if (a == "DIS" || a == "DIT" || a == "ECH" || a == "4DT" || a == "C-B" || a == "AFN" || a == "GLO" || a == "SKY")
     {
         device = "Satellite";
     }
