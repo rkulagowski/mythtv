@@ -655,16 +655,15 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
     {
         QString lineup, device;
 
-        if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
-        {
-            // It's a postal code
-        }
-        else
-        {
             lineup = source.lineupid.section(':', 0, 0);
             device = source.lineupid.section(':', 1, 1);
-        }
 
+        if (lineup == "PC")
+        {
+            lineup = device;
+            device = "Antenna";
+        }
+        
         if (device == "")
         {
             device = "Analog";
@@ -675,6 +674,10 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
             * function at Schedules Direct is open so that it can be used by the QAM
             * scanner.
         */
+
+
+qDebug() << "lineup is " << lineup << "device is " << device;
+
 
 
         url = urlbase + "?command=get&p1=lineup&p2=" + lineup;
@@ -730,14 +733,20 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
 {
     QString lineup, device;
 
-    if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
-    {
+//    if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
+//    {
         // It's a postal code
-    }
-    else
-    {
+//    }
+//    else
+//    {
         lineup = source.lineupid.section(':', 0, 0);
         device = source.lineupid.section(':', 1, 1);
+//    }
+
+    if (lineup == "PC") // "Postal Code"
+    {
+        lineup = device; // Move the postal code to the lineup part.
+        device = "Antenna";
     }
 
     QString a = lineup.left(3);
