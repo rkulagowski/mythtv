@@ -123,6 +123,8 @@ private:
     QMap<uint, bool>     refresh_day;
     bool                refresh_all;
     mutable QStringList fatalErrors;
+    int     new_version;
+    QString new_modified;
 };
 
 #endif // _FILLDATA_H_

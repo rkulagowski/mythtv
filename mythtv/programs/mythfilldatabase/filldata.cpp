@@ -655,15 +655,15 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
     {
         QString lineup, device;
 
-            lineup = source.lineupid.section(':', 0, 0);
-            device = source.lineupid.section(':', 1, 1);
+        lineup = source.lineupid.section(':', 0, 0);
+        device = source.lineupid.section(':', 1, 1);
 
         if (lineup == "PC")
         {
             lineup = device;
             device = "Antenna";
         }
-        
+
         if (device == "")
         {
             device = "Analog";
@@ -676,9 +676,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
         */
 
 
-qDebug() << "lineup is " << lineup << "device is " << device;
-
-
+        //qDebug() << "lineup is " << lineup << "device is " << device;
 
         url = urlbase + "?command=get&p1=lineup&p2=" + lineup;
         GetMythDownloadManager()->download(url, &dl_file, false);
@@ -733,15 +731,8 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
 {
     QString lineup, device;
 
-//    if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
-//    {
-        // It's a postal code
-//    }
-//    else
-//    {
-        lineup = source.lineupid.section(':', 0, 0);
-        device = source.lineupid.section(':', 1, 1);
-//    }
+    lineup = source.lineupid.section(':', 0, 0);
+    device = source.lineupid.section(':', 1, 1);
 
     if (lineup == "PC") // "Postal Code"
     {
@@ -751,9 +742,13 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
 
     QString a = lineup.left(3);
 
-    if (a == "DIS" || a == "DIT" || a == "ECH" || a == "4DT" || a == "C-B" || a == "AFN" || a == "GLO" || a == "SKY")
+    if (a == "4DT" || a == "AFN" || a == "C-B" || a == "DIT" || a == "DIS" || a == "ECH" || a == "GLO")
     {
         device = "Satellite";
+    }
+    else if (a == "SKY" || a == "FAV")
+    {
+        device = "Internet";
     }
     else if (device == "")
     {
@@ -770,7 +765,7 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
     {
         MSqlQuery startstopstatus_query(MSqlQuery::InitCon());
 
-        qDebug() << "Couldn't open filename: " << filename;
+        qDebug() << "In is_SDHeadendVersionUpdated: Couldn't open filename: " << filename;
         QString status = "Failed to open filename " + filename;
         updateLastRunStatus(startstopstatus_query, status);
         return -1;
@@ -788,22 +783,25 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
         return -1;
     }
 
-    foreach(QVariant devtypes, result["DeviceTypes"].toList())
+    foreach(QVariant meta, result["metadata"].toList())
     {
-        QVariantMap nestedLineupInfo = result[devtypes.toString()].toMap();
+        QVariantMap nestedInfo = meta.toMap();
 
-        if (devtypes.toString() == device)
+        if (nestedInfo["device"].toString() == device)
         {
+            new_version = nestedInfo["version"].toInt();
+            new_modified = nestedInfo["modified"].toString();
+
             if
             (
-                (nestedLineupInfo["version"].toInt() != source.version) ||
-                (nestedLineupInfo["modified"].toString() != source.modified)
+                (new_version != source.version) ||
+                (new_modified != source.modified)
             )
             {
                 LOG(VB_GENERAL, LOG_INFO,
                     QString("Updated headend. Old version: %1 Old last modified: %2").arg(source.version).arg(source.modified));
                 LOG(VB_GENERAL, LOG_INFO,
-                    QString("Updated headend. New version: %1 New last modified: %2").arg(nestedLineupInfo["version"].toInt()).arg(nestedLineupInfo["modified"].toString()));
+                    QString("Updated headend. New version: %1 New last modified: %2").arg(new_version).arg(new_modified));
                 return 1;
             }
             else
@@ -820,24 +818,25 @@ int FillData::UpdateChannelTablefromSD(Source source)
 // return a -1 for error, 0 for not updated, 1 for updated.
 {
     QString lineup, device;
-    int new_version = 0; // Not really, but quiets a warning.
-    QString new_modified;
 
-    if (source.lineupid.length() == 5 or source.lineupid.length() == 6)
+    lineup = source.lineupid.section(':', 0, 0);
+    device = source.lineupid.section(':', 1, 1);
+
+    if (lineup == "PC") // "Postal Code"
     {
-        // It's a postal code
-    }
-    else
-    {
-        lineup = source.lineupid.section(':', 0, 0);
-        device = source.lineupid.section(':', 1, 1);
+        lineup = device; // Move the postal code to the lineup part.
+        device = "Antenna";
     }
 
     QString a = lineup.left(3);
 
-    if (a == "DIS" || a == "DIT" || a == "ECH" || a == "4DT" || a == "C-B" || a == "AFN" || a == "GLO" || a == "SKY")
+    if (a == "4DT" || a == "AFN" || a == "C-B" || a == "DIT" || a == "DIS" || a == "ECH" || a == "GLO")
     {
         device = "Satellite";
+    }
+    else if (a == "SKY" || a == "FAV")
+    {
+        device = "Internet";
     }
     else if (device == "")
     {
@@ -850,7 +849,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
     if (!inputfile.open(QIODevice::ReadOnly))
     {
-        qDebug() << "Couldn't open filename: " << filename;
+        qDebug() << "In: UpdateChannelTablefromSD: Couldn't open filename: " << filename;
         QString status = "Failed to open filename " + filename;
         return -1;
     }
@@ -869,8 +868,8 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
     MSqlQuery insert(MSqlQuery::InitCon());
     insert.prepare(
-        "INSERT INTO channel(chanid, channum, xmltvid, sourceid) "
-        "VALUES(:CHANID, :CHANNUM, :XMLTVID, :SOURCEID) "
+        "INSERT INTO channel(chanid, channum, freqid, xmltvid, sourceid) "
+        "VALUES(:CHANID, :CHANNUM, :FREQID, :XMLTVID, :SOURCEID) "
         "ON DUPLICATE KEY UPDATE channum = VALUES(channum), xmltvid=VALUES(xmltvid)"
     );
 
@@ -878,47 +877,76 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
     foreach(QVariant devtypes, result["DeviceTypes"].toList())
     {
-        //        qDebug() << "device is" << devtypes.toString();
+//        qDebug() << "device is" << devtypes.toString();
         QVariantMap nestedLineupInfo = result[devtypes.toString()].toMap();
 
         if (devtypes.toString() == device)
         {
-            new_version = nestedLineupInfo["version"].toInt();
-            new_modified = nestedLineupInfo["modified"].toString();
-
-            //            qDebug() << "new version is " << new_version << "new modified is " << new_modified;
-
-            foreach(QVariant chanmap, nestedLineupInfo["map"].toList())
+            if (device != "Antenna")
             {
-                QVariantMap chan = chanmap.toMap();
-                //                qDebug() << "channel:" << chan["channel"].toString();
-                //                qDebug() << "stationid: " << chan["stationid"].toString();
-                int chanid = (source.id * 1000) + chan["channel"].toInt();
-                insert.bindValue(":CHANID", chanid);
-                insert.bindValue(":CHANNUM", chan["channel"].toString());
-                insert.bindValue(":XMLTVID", chan["stationid"].toString());
-                insert.bindValue(":SOURCEID", source.id);
-
-                if (!insert.exec())
+                foreach(QVariant chanmap, nestedLineupInfo["map"].toList())
                 {
-                    MythDB::DBError("Loading data", insert);
-                    return -1;
+                    QVariantMap chan = chanmap.toMap();
+                    //                qDebug() << "channel:" << chan["channel"].toString();
+                    //                qDebug() << "stationid: " << chan["stationid"].toString();
+                    int chanid = (source.id * 1000) + chan["channel"].toInt();
+                    insert.bindValue(":CHANID", chanid);
+                    insert.bindValue(":CHANNUM", chan["channel"].toString());
+                    insert.bindValue(":FREQID", "");
+                    insert.bindValue(":XMLTVID", chan["stationid"].toString());
+                    insert.bindValue(":SOURCEID", source.id);
+
+                    if (!insert.exec())
+                    {
+                        MythDB::DBError("Loading data", insert);
+                        return -1;
+                    }
+                }
+            }
+            else
+            {
+                foreach(QVariant chanmap, result["StationID"].toList())
+                {
+                    QVariantMap chan = chanmap.toMap();
+                    QString c = "000" + chan["atsc_major"].toString() + chan["atsc_minor"].toString();
+                    int chanid = (source.id * 1000) + c.right(3).toInt();;
+// Don't forget analog atsc_major and minor=0
+//qDebug() << "chanid" << chanid;
+//                    insert.bindValue(
+//                    qDebug() << "statid" <<  chan["stationid"].toString();
+//                    qDebug() << "callsign" << chan["callsign"].toString();
+//                    qDebug() << "url" << chan["url"].toString();
+
+                        
+
+
                 }
             }
 
             MSqlQuery update(MSqlQuery::InitCon());
 
-            update.prepare(
-                "UPDATE channel SET callsign=:CALLSIGN, name=:NAME WHERE (sourceid=:SOURCEID AND xmltvid=:XMLTVID)"
-            );
+            if (device == "Antenna")
+            {
+                update.prepare(
+                    "UPDATE channel SET callsign=:CALLSIGN, name=:NAME WHERE (sourceid=:SOURCEID AND xmltvid=:XMLTVID)"
+                );
+
+            }
+            else
+            {
+                update.prepare(
+                    "UPDATE channel SET callsign=:CALLSIGN, name=:NAME WHERE (sourceid=:SOURCEID AND xmltvid=:XMLTVID)"
+                );
+            }
 
 
             foreach(QVariant chanmap, result["StationID"].toList())
             {
                 QVariantMap chan = chanmap.toMap();
-                //qDebug() << "statid" <<  chan["stationid"].toString();
-                //qDebug() << "callsign" << chan["callsign"].toString();
-                //qDebug() << "url" << chan["url"].toString();
+                qDebug() << "statid" <<  chan["stationid"].toString();
+                qDebug() << "callsign" << chan["callsign"].toString();
+                qDebug() << "url" << chan["url"].toString();
+
 
                 QAM qamstruct;
 
@@ -1118,7 +1146,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
         if (!inputfile.open(QIODevice::ReadOnly))
         {
-            qDebug() << "Couldn't open filename: " << filename;
+            qDebug() << "In InsertSDDataintoDatabase: Couldn't open filename: " << filename;
             QString status = "Failed to open filename " + filename;
             updateLastRunStatus(startstopstatus_query, status);
             return false;
