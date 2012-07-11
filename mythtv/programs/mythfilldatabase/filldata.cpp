@@ -877,7 +877,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
     foreach(QVariant devtypes, result["DeviceTypes"].toList())
     {
-//        qDebug() << "device is" << devtypes.toString();
+        //        qDebug() << "device is" << devtypes.toString();
         QVariantMap nestedLineupInfo = result[devtypes.toString()].toMap();
 
         if (devtypes.toString() == device)
@@ -909,16 +909,30 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 {
                     QVariantMap chan = chanmap.toMap();
                     QString c = "000" + chan["atsc_major"].toString() + chan["atsc_minor"].toString();
-                    int chanid = (source.id * 1000) + c.right(3).toInt();;
-// Don't forget analog atsc_major and minor=0
-//qDebug() << "chanid" << chanid;
-//                    insert.bindValue(
-//                    qDebug() << "statid" <<  chan["stationid"].toString();
-//                    qDebug() << "callsign" << chan["callsign"].toString();
-//                    qDebug() << "url" << chan["url"].toString();
+                    int chanid;
 
-                        
+                    if ((chan["atsc_major"].toInt() + chan["atsc_minor"].toInt()) == 0)
+                    {
+                        // It's an analog over-the-air.
+                        chanid = (source.id * 1000) + chan["uhf_vhf"].toInt();
+                        insert.bindValue(":CHANNUM", chan["uhf_vhf"].toString());
+                    }
+                    else
+                    {
+                        chanid = (source.id * 1000) + c.right(3).toInt();
+                        insert.bindValue(":CHANNUM", chan["atsc_major"].toString() + "." + chan["atsc_minor"].toString());
+                    }
 
+                    insert.bindValue(":CHANID", chanid);
+                    insert.bindValue(":FREQID", chan["uhf_vhf"].toString());
+                    insert.bindValue(":XMLTVID", chan["stationid"].toString());
+                    insert.bindValue(":SOURCEID", source.id);
+
+                    if (!insert.exec())
+                    {
+                        MythDB::DBError("Loading data", insert);
+                        return -1;
+                    }
 
                 }
             }
@@ -943,9 +957,9 @@ int FillData::UpdateChannelTablefromSD(Source source)
             foreach(QVariant chanmap, result["StationID"].toList())
             {
                 QVariantMap chan = chanmap.toMap();
-                qDebug() << "statid" <<  chan["stationid"].toString();
-                qDebug() << "callsign" << chan["callsign"].toString();
-                qDebug() << "url" << chan["url"].toString();
+                //                qDebug() << "statid" <<  chan["stationid"].toString();
+                //                qDebug() << "callsign" << chan["callsign"].toString();
+                //                qDebug() << "url" << chan["url"].toString();
 
 
                 QAM qamstruct;
