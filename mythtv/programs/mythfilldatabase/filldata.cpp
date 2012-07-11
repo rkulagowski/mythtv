@@ -1212,7 +1212,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
         {
             // Iterate through all the schedule information for this XMLID.
             i.next();
-            // qDebug() << i.key() << ": " << i.value();
+//qDebug() << i.key() << ": " << i.value();
 
             QVariantMap result = parser.parse(i.value().toLocal8Bit(), &ok).toMap();
 
@@ -1331,7 +1331,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             MSqlQuery link_holiday_to_program(MSqlQuery::InitCon());
 
             insert_program.prepare(
-                "INSERT INTO program ("
+                "INSERT IGNORE INTO program ("
                 "chanid, starttime, endtime,"
                 "title, subtitle, description,"
                 "season, episode, stereo, hdtv,"
@@ -1341,7 +1341,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 "dubbed, dubbed_language, educational, "
                 "sap, sap_language, subtitled, subtitled_language, new, "
                 "subject_to_blackout, time_approximate, joined_in_progress, "
-                "left_in_progress, cable_in_the_classroom, enhanced, dolby) "
+                "left_in_progress, cable_in_the_classroom, enhanced, dolby, listingsource) "
                 "VALUES ("
                 ":CHANID, :STARTTIME, :ENDTIME,"
                 ":TITLE, :SUBTITLE, :DESCRIPTION,"
@@ -1352,7 +1352,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 ":DUBBED, :DUBBED_LANGUAGE, :EDUCATIONAL,"
                 ":SAP, :SAP_LANGUAGE, :SUBTITLED, :SUBTITLED_LANGUAGE, :IS_NEW,"
                 ":SUBJECT_TO_BLACKOUT, :TIME_APPROXIMATE, :JOINED_IN_PROGRESS,"
-                ":LEFT_IN_PROGRESS, :CABLE_IN_THE_CLASSROOM, :ENHANCED, :DOLBY)");
+                ":LEFT_IN_PROGRESS, :CABLE_IN_THE_CLASSROOM, :ENHANCED, :DOLBY, :LSOURCE)");
 
             insert_rating.prepare(
                 "INSERT programrating(chanid, starttime, system, rating, adultsituations, violence, language, dialog, fantasyviolence) "
@@ -1392,7 +1392,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
                 // Living dangerously, or speeding things up?
                 // Sanity check on whether the downloaded data is valid first?
-
+/*
                 MSqlQuery purge(MSqlQuery::InitCon());
                 purge.prepare(
                     "DELETE FROM program where chanid = :CHANID"
@@ -1405,7 +1405,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                     MythDB::DBError("Deleting data", purge);
                     return false;
                 }
-
+*/
                 insert_program.bindValue(":CHANID", chanid);
                 insert_program.bindValue(":STARTTIME", UTCdt_start);
                 insert_program.bindValue(":ENDTIME", UTCdt_end);
@@ -1443,6 +1443,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 insert_program.bindValue(":ENHANCED", is_enhanced);
                 insert_program.bindValue(":DVS", has_dvs);
                 insert_program.bindValue(":DOLBY", dolby);
+                insert_program.bindValue(":LSOURCE", kListingSourceDDSchedulesDirect);
 
                 insert_rating.bindValue(":CHANID", chanid);
                 insert_rating.bindValue(":STARTTIME", UTCdt_start);
