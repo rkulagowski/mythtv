@@ -903,46 +903,48 @@ int FillData::UpdateChannelTablefromSD(Source source)
                     }
                 }
             }
-            else
-            {
-                foreach(QVariant chanmap, result["StationID"].toList())
-                {
-                    QVariantMap chan = chanmap.toMap();
-                    QString c = "000" + chan["atsc_major"].toString() + chan["atsc_minor"].toString();
-                    int chanid;
 
-                    if ((chan["atsc_major"].toInt() + chan["atsc_minor"].toInt()) == 0)
-                    {
-                        // It's an analog over-the-air.
-                        chanid = (source.id * 1000) + chan["uhf_vhf"].toInt();
-                        insert.bindValue(":CHANNUM", chan["uhf_vhf"].toString());
-                    }
-                    else
-                    {
-                        chanid = (source.id * 1000) + c.right(3).toInt();
-                        insert.bindValue(":CHANNUM", chan["atsc_major"].toString() + "." + chan["atsc_minor"].toString());
-                    }
+            /*            else
+                        {
+                            foreach(QVariant chanmap, result["StationID"].toList())
+                            {
+                                QVariantMap chan = chanmap.toMap();
+                                QString c = "000" + chan["atsc_major"].toString() + chan["atsc_minor"].toString();
+                                int chanid;
 
-                    insert.bindValue(":CHANID", chanid);
-                    insert.bindValue(":FREQID", chan["uhf_vhf"].toString());
-                    insert.bindValue(":XMLTVID", chan["stationid"].toString());
-                    insert.bindValue(":SOURCEID", source.id);
+                                if ((chan["atsc_major"].toInt() + chan["atsc_minor"].toInt()) == 0)
+                                {
+                                    // It's an analog over-the-air.
+                                    chanid = (source.id * 1000) + chan["uhf_vhf"].toInt();
+                                    insert.bindValue(":CHANNUM", chan["uhf_vhf"].toString());
+                                }
+                                else
+                                {
+                                    chanid = (source.id * 1000) + c.right(3).toInt();
+                                    insert.bindValue(":CHANNUM", chan["atsc_major"].toString() + "." + chan["atsc_minor"].toString());
+                                }
 
-                    if (!insert.exec())
-                    {
-                        MythDB::DBError("Loading data", insert);
-                        return -1;
-                    }
+                                insert.bindValue(":CHANID", chanid);
+                                insert.bindValue(":FREQID", chan["uhf_vhf"].toString());
+                                insert.bindValue(":XMLTVID", chan["stationid"].toString());
+                                insert.bindValue(":SOURCEID", source.id);
 
-                }
-            }
+                                if (!insert.exec())
+                                {
+                                    MythDB::DBError("Loading data", insert);
+                                    return -1;
+                                }
 
+                            }
+                        }
+            */
             MSqlQuery update(MSqlQuery::InitCon());
 
             if (device == "Antenna")
             {
                 update.prepare(
-                    "UPDATE channel SET callsign=:CALLSIGN, name=:NAME WHERE (sourceid=:SOURCEID AND xmltvid=:XMLTVID)"
+                    "UPDATE channel SET callsign=:CALLSIGN, name=:NAME, xmltvid=:XMLTVID WHERE "
+                    "(sourceid=:SOURCEID AND atsc_major_chan=:ATSC_major AND atsc_minor_chan=:ATSC_minor)"
                 );
 
             }
@@ -977,6 +979,13 @@ int FillData::UpdateChannelTablefromSD(Source source)
                 update.bindValue(":NAME", chan["callsign"].toString());
                 update.bindValue(":SOURCEID", source.id);
                 update.bindValue(":XMLTVID", chan["stationid"].toString());
+
+                if (device == "Antenna")
+                {
+                    update.bindValue(":ATSC_major", chan["atsc_major"].toString());
+                    update.bindValue(":ATSC_minor", chan["atsc_minor"].toString());
+                }
+
 
                 if (!update.exec())
                 {
@@ -1104,6 +1113,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
     bool cable_in_the_classroom;
     bool is_new, is_enhanced, is_3d, is_hdtv, is_letterboxed, has_dvs;
     bool is_dubbed, is_sap, is_subtitled, is_premiere, is_finale;
+    QString prog_id;
     QString network_syndicated_source, network_syndicated_type;
     QString live_tape_delay, dolby;
     QString premiere_finale;
@@ -1196,7 +1206,8 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
             if (result["datatype"].toString() == "schedule")
             {
-                schedule[result["prog_id"].toString()] = line;
+                // Build a "complicated" key to ensure that there are no duplicates.
+                schedule[result["air_date"].toString()+result["air_time"].toString()+result["duration"].toString()] = line;
             }
             else
             {
@@ -1212,7 +1223,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
         {
             // Iterate through all the schedule information for this XMLID.
             i.next();
-//qDebug() << i.key() << ": " << i.value();
+            //qDebug() << i.key() << ": " << i.value();
 
             QVariantMap result = parser.parse(i.value().toLocal8Bit(), &ok).toMap();
 
@@ -1229,6 +1240,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             episode = result["episode"].toString();
             part_num = result["part_num"].toInt();
             num_parts = result["num_parts"].toInt();
+            prog_id = result["prog_id"].toString();
 
             subject_to_blackout = result["subject_to_blackout"].toBool();
             is_educational = result["educational"].toBool();
@@ -1281,7 +1293,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             QDateTime UTCdt_start = QDateTime::fromString(air_date + " " + air_time, Qt::ISODate);
             QDateTime UTCdt_end = UTCdt_start.addSecs(duration);
 
-            QVariantMap prog_info = parser.parse(program_information[i.key()].toLocal8Bit(), &ok).toMap();
+            QVariantMap prog_info = parser.parse(program_information[prog_id].toLocal8Bit(), &ok).toMap();
 
             // Use the key (program ID) from the schedule to get the program information for that timeslot.
             if (!ok)
@@ -1392,20 +1404,20 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
                 // Living dangerously, or speeding things up?
                 // Sanity check on whether the downloaded data is valid first?
-/*
-                MSqlQuery purge(MSqlQuery::InitCon());
-                purge.prepare(
-                    "DELETE FROM program where chanid = :CHANID"
-                );
+                /*
+                                MSqlQuery purge(MSqlQuery::InitCon());
+                                purge.prepare(
+                                    "DELETE FROM program where chanid = :CHANID"
+                                );
 
-                purge.bindValue(":CHANID", chanid);
+                                purge.bindValue(":CHANID", chanid);
 
-                if (!purge.exec())
-                {
-                    MythDB::DBError("Deleting data", purge);
-                    return false;
-                }
-*/
+                                if (!purge.exec())
+                                {
+                                    MythDB::DBError("Deleting data", purge);
+                                    return false;
+                                }
+                */
                 insert_program.bindValue(":CHANID", chanid);
                 insert_program.bindValue(":STARTTIME", UTCdt_start);
                 insert_program.bindValue(":ENDTIME", UTCdt_end);
@@ -1421,7 +1433,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                 insert_program.bindValue(":PARTTOTAL", num_parts);
                 insert_program.bindValue(":SERIESID", syn_epi_num);
                 insert_program.bindValue(":ORIGINALAIRDATE", orig_air_date);
-                insert_program.bindValue(":PROGID", i.key());
+                insert_program.bindValue(":PROGID", prog_id);
                 insert_program.bindValue(":FIRST", is_premiere);
                 insert_program.bindValue(":LAST", is_finale);
                 insert_program.bindValue(":3D", is_3d);
@@ -1450,7 +1462,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
                 // qDebug() << "progid: " << i.key() << "tv_rating: " << tv_rating;
 
-                if (i.key().left(2) == "MV")
+                if (prog_id.left(2) == "MV")
                 {
                     insert_rating.bindValue(":SYSTEM", "MPAA");
                 }
