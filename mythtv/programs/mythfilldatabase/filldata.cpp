@@ -1383,7 +1383,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
             link_genres_to_program.prepare(
                 "INSERT IGNORE INTO programgenres(chanid, starttime, relevance, genre) "
-                "VALUES (:CHANID, :STARTTIME, :RELEVANCE, :PERSON)"
+                "VALUES (:CHANID, :STARTTIME, :RELEVANCE, :GENRE)"
             );
 
             link_advisories_to_program.prepare(
@@ -1516,7 +1516,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                     link_genres_to_program.bindValue(":CHANID", chanid);
                     link_genres_to_program.bindValue(":STARTTIME", UTCdt_start);
                     link_genres_to_program.bindValue(":RELEVANCE", relevance);
-                    link_genres_to_program.bindValue(":PERSON", genre.toString());
+                    link_genres_to_program.bindValue(":GENRE", genre.toString());
 
                     if (!link_genres_to_program.exec())
                     {
