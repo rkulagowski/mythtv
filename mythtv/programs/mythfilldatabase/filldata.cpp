@@ -555,7 +555,7 @@ QString FillData::GetSDLoginRandhash(Source source)
     QByteArray header = "Content-Type";
     QByteArray value = "application/x-www-form-urlencoded";
 
-    if (!manager->postAuth(loginurl, &postdata, NULL, NULL, &header, &value))
+    if (!manager->postAuth(loginurl, &postdata, NULL, NULL, NULL))
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not post auth credentials to Schedules Direct."));
         return QString("error");
