@@ -535,8 +535,8 @@ QString FillData::GetSDLoginRandhash(Source source)
 {
     QString randhash = "";
 
-    QString loginurl = "http://10.244.23.50/schedulesdirect/login.php";
-    //    QString loginurl = "http://rkulagow.schedulesdirect.org/schedulesdirect/login.php";
+    // QString loginurl = "http://10.244.23.50/schedulesdirect/login.php";
+    QString loginurl = "http://rkulagow.schedulesdirect.org/rh.php";
 
     LOG(VB_GENERAL, LOG_INFO, "Getting randhash from Schedules Direct");
     MythDownloadManager *manager = GetMythDownloadManager();
@@ -546,26 +546,26 @@ QString FillData::GetSDLoginRandhash(Source source)
     tempdata += source.userid;
     tempdata += "&password=";
     tempdata += source.password;
-    tempdata += "&submit=Log+In";
+    tempdata += "&submit=login";
 
     postdata = tempdata.toPercentEncoding("&=+");
 
-    QByteArray header = "Content-Type";
-    QByteArray value = "application/x-www-form-urlencoded";
+    QHash<QByteArray, QByteArray> headers;
+    headers.insert("Content-Type", "application/x-www-form-urlencoded");
 
-    if (!manager->postAuth(loginurl, &postdata, NULL, NULL, NULL))
+    if (!manager->postAuth(loginurl, &postdata, NULL, NULL, &headers))
     {
         LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not post auth credentials to Schedules Direct."));
         return QString("error");
     }
 
     // Next part is just for debugging
-    /*    QString randhashFile = QString("/tmp/sd_randhash");
+/*        QString randhashFile = QString("/tmp/sd_randhash");
         QFile file(randhashFile);
         file.open(QIODevice::WriteOnly);
         file.write(postdata);
         file.close();
-    */
+*/
 
     QRegExp rx("randhash: ([a-z0-9]+)");
 
@@ -587,8 +587,8 @@ QString FillData::GetSDLoginRandhash(Source source)
 bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source source)
 {
 
-    //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
-    QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
+    QString urlbase = "http://rkulagow.schedulesdirect.org/proc.php";
+    //QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
     QString url;
     QString destfile;
 
@@ -709,8 +709,8 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
 bool FillData::getSchedulesDirectStatusMessages(QString randhash)
 {
-    //QString urlbase = "http://rkulagow.schedulesdirect.org/schedulesdirect/process.php";
-    QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
+    QString urlbase = "http://rkulagow.schedulesdirect.org/proc.php";
+    //QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
     QString url;
     QString destfile;
     QDateTime qdtNow = MythDate::current();
