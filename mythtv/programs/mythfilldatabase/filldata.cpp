@@ -491,10 +491,10 @@ bool FillData::GrabData(Source source, int offset, QDate *qCurrentDate)
         else
         {
             status = QObject::tr("FAILED: XMLTV grabber returned error code %1.")
-                            .arg(systemcall_status);
+                     .arg(systemcall_status);
             LOG(VB_GENERAL, LOG_ERR, LOC +
                 QString("XMLTV grabber returned error code %1")
-                    .arg(systemcall_status));
+                .arg(systemcall_status));
         }
     }
 
@@ -560,12 +560,12 @@ QString FillData::GetSDLoginRandhash(Source source)
     }
 
     // Next part is just for debugging
-/*        QString randhashFile = QString("/tmp/sd_randhash");
-        QFile file(randhashFile);
-        file.open(QIODevice::WriteOnly);
-        file.write(postdata);
-        file.close();
-*/
+    /*        QString randhashFile = QString("/tmp/sd_randhash");
+            QFile file(randhashFile);
+            file.open(QIODevice::WriteOnly);
+            file.write(postdata);
+            file.close();
+    */
 
     QRegExp rx("randhash: ([a-z0-9]+)");
 
@@ -600,13 +600,19 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
         QString xmltvid;
 
         MSqlQuery query(MSqlQuery::InitCon());
+        MSqlQuery urlquery(MSqlQuery::InitCon());
+
         query.prepare(
             "SELECT DISTINCT(xmltvid) FROM channel WHERE visible=1 ORDER BY xmltvid ASC"
         );
 
+        urlquery.prepare(
+            "SELECT url FROM url_map WHERE xmltvid = :XMLTVID"
+        );
+
         if (!query.exec())
         {
-            MythDB::DBError("FillData::grabData", query);
+            MythDB::DBError("FillData::DownloadSDFiles", query);
             return false;
         }
 
@@ -617,15 +623,20 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
             // particular XMLID no matter where they are.
         {
             xmltvid = query.value(0).toString();
+            urlquery.bindValue(":XMLTVID", xmltvid);
+
+            urlquery.exec();
+            urlquery.next();
+            url = urlquery.value(0).toString();
+
+            url = url + "&rand=" + randhash;
 
             if (whattoget == "schedule")
             {
-                url = urlbase + "?command=get&p1=schedule&p2=" + xmltvid + "&rand=" + randhash;
                 destfile = "/tmp/" + xmltvid + "_sched.txt";
             }
             else
             {
-                url = urlbase + "?command=get&p1=meta&p2=" + xmltvid + "&rand=" + randhash;
                 destfile = "/tmp/" + xmltvid + "_meta.txt";
             }
 
@@ -1205,7 +1216,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
             if (result["datatype"].toString() == "schedule")
             {
                 // Build a "complicated" key to ensure that there are no duplicates.
-                schedule[result["air_date"].toString()+result["air_time"].toString()+result["duration"].toString()] = line;
+                schedule[result["air_date"].toString() + result["air_time"].toString() + result["duration"].toString()] = line;
             }
             else
             {
@@ -1281,7 +1292,6 @@ bool FillData::InsertSDDataintoDatabase(Source source)
                     is_finale = true;
                 }
             }
-
 
             network_syndicated_source = result["net_syn_source"].toString();
             network_syndicated_type = result["net_syn_type"].toString();
@@ -1568,6 +1578,81 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 }
 
 
+bool FillData::ProcessXMLTV_URL(Source source)
+{
+    QString lineup, device;
+
+    lineup = source.lineupid.section(':', 0, 0);
+    device = source.lineupid.section(':', 1, 1);
+
+    if (lineup == "PC") // "Postal Code"
+    {
+        lineup = device; // Move the postal code to the lineup part.
+        device = "Antenna";
+    }
+
+    QString a = lineup.left(3);
+
+    if (a == "4DT" || a == "AFN" || a == "C-B" || a == "DIT" || a == "DIS" || a == "ECH" || a == "GLO")
+    {
+        device = "Satellite";
+    }
+    else if (a == "SKY" || a == "FAV")
+    {
+        device = "Internet";
+    }
+    else if (device == "")
+    {
+        device = "Analog";
+    }
+
+    QString filename = "/tmp/" + lineup + ".txt";
+
+    QFile inputfile(filename);
+
+    if (!inputfile.open(QIODevice::ReadOnly))
+    {
+        qDebug() << "In: ProcessXMLTV_URL: Couldn't open filename: " << filename;
+        QString status = "Failed to open filename " + filename;
+        return false;
+    }
+
+    QByteArray lineupdata = inputfile.readAll();
+
+    QJson::Parser parser;
+    bool ok;
+    QVariantMap result = parser.parse(lineupdata, &ok).toMap();
+
+    if (!ok)
+    {
+        printf("line %d: %s\n", parser.errorLine(), parser.errorString().toUtf8().data());
+        return false;
+    }
+
+    MSqlQuery update(MSqlQuery::InitCon());
+
+    update.prepare("REPLACE INTO url_map(xmltvid, url) VALUES(:XMLTVID, :URL)");
+
+    foreach(QVariant chanmap, result["StationID"].toList())
+    {
+        QVariantMap chan = chanmap.toMap();
+//        qDebug() << "statid" <<  chan["stationid"].toString();
+//        qDebug() << "url" << chan["url"].toString();
+
+        update.bindValue(":URL", chan["url"].toString());
+        update.bindValue(":XMLTVID", chan["stationid"].toString());
+
+        if (!update.exec())
+        {
+            MythDB::DBError("ProcessXMLTV_URL", update);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 /** \fn FillData::Run(SourceList &sourcelist)
  *  \brief Goes through the sourcelist and updates its channels with
  *         program info grabbed with the associated grabber.
@@ -1777,7 +1862,7 @@ bool FillData::Run(SourceList &sourcelist)
             * The "schedulesdirect1" grabber is for the internal grabber to TMS
             * so we use schedulesdirect2 to differentiate.
             * Process for downloading Schedules Direct JSON data files.
-            * Execute a login to http://rkulagow.schedulesdirect.org/login.php
+            * Execute a login to http://rkulagow.schedulesdirect.org/rh.php
             * Scan the downloaded file for the randhash.
             * Download status messages
             * Compare our version number and modified of the headend with what was
@@ -1818,6 +1903,11 @@ bool FillData::Run(SourceList &sourcelist)
                 // The lineup is the map of channel numbers to XMLIDs in a particular headend.
                 fatalErrors.push_back("Error downloading lineup information from Schedules Direct.");
                 break;
+            }
+            else
+            {
+                // Valid download, so update the table that tracks the download location for a XMLID.
+                ProcessXMLTV_URL(*it);
             }
 
             if (!DownloadSDFiles(randhash, "schedule", *it))
@@ -2154,9 +2244,9 @@ bool FillData::Run(SourceList &sourcelist)
         if (nonewdata > 0 &&
             (total_sources != externally_handled))
             status = QObject::tr(
-                     "mythfilldatabase ran, but did not insert "
-                     "any new data into the Guide for %1 of %2 sources. "
-                     "This can indicate a potential grabber failure.")
+                         "mythfilldatabase ran, but did not insert "
+                         "any new data into the Guide for %1 of %2 sources. "
+                         "This can indicate a potential grabber failure.")
                      .arg(nonewdata)
                      .arg(total_sources);
         else
