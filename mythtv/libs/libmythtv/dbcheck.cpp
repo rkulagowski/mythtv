@@ -2349,6 +2349,11 @@ NULL
 "PRIMARY KEY (chanid, starttime, holiday),",
 "KEY holiday(holiday)",
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
+"CREATE TABLE url_map(",
+"xmltvid VARCHAR(64),",
+"url VARCHAR(1024),",
+"PRIMARY KEY(xmltvid)",
+") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
 
 NULL
 };
