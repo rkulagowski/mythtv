@@ -536,7 +536,7 @@ QString FillData::GetSDLoginRandhash(Source source)
     QString randhash = "";
 
     // QString loginurl = "http://10.244.23.50/schedulesdirect/login.php";
-    QString loginurl = "http://rkulagow.schedulesdirect.org/rh.php";
+    QString loginurl = "http://ec2-50-17-151-67.compute-1.amazonaws.com/rh.php";
 
     LOG(VB_GENERAL, LOG_INFO, "Getting randhash from Schedules Direct");
     MythDownloadManager *manager = GetMythDownloadManager();
@@ -587,7 +587,7 @@ QString FillData::GetSDLoginRandhash(Source source)
 bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source source)
 {
 
-    QString urlbase = "http://rkulagow.schedulesdirect.org/proc.php";
+    QString urlbase = "http://ec2-50-17-151-67.compute-1.amazonaws.com/proc.php";
     //QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
     QString url;
     QString destfile;
@@ -720,7 +720,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
 bool FillData::getSchedulesDirectStatusMessages(QString randhash)
 {
-    QString urlbase = "http://rkulagow.schedulesdirect.org/proc.php";
+    QString urlbase = "http://ec2-50-17-151-67.compute-1.amazonaws.com/proc.php";
     //QString urlbase = "http://10.244.23.50/schedulesdirect/process.php";
     QString url;
     QString destfile;
