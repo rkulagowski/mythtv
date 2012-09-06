@@ -21,7 +21,6 @@ using namespace std;
 
 // MythTV headers
 #include "mythmiscutil.h"
-#include "mythcoreutil.h" // for extractZIP
 #include "exitcodes.h"
 #include "mythlogging.h"
 #include "mythdbcon.h"
