@@ -21,6 +21,7 @@ using namespace std;
 
 // MythTV headers
 #include "mythmiscutil.h"
+#include "mythcoreutil.h" // for extractZIP
 #include "exitcodes.h"
 #include "mythlogging.h"
 #include "mythdbcon.h"
@@ -592,9 +593,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
     QString url;
     QString destfile;
 
-    QByteArray dl_file;
-
-    if (whattoget == "schedule"  || whattoget == "meta")
+    if (whattoget == "schedule")
     {
         // Download all the unique XMLIDs
         QString xmltvid;
@@ -616,7 +615,11 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
             return false;
         }
 
-        LOG(VB_GENERAL, LOG_INFO, QString("%1 unique XMLIDs to download").arg(query.size()));
+        int total_XMLID = query.size();
+
+        LOG(VB_GENERAL, LOG_INFO, QString("%1 unique XMLIDs to download").arg(total_XMLID));
+
+        QString tempDLDirectory = ddprocessor.CreateTempDirectory();
 
         while (query.next())
             // We're going to update all chanid's in the database that use this
@@ -631,38 +634,90 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
             url = url + "&rand=" + randhash;
 
-            if (whattoget == "schedule")
+            destfile = tempDLDirectory + "/" + xmltvid + "_sched.txt.gz";
+
+            //            QByteArray dl_file;
+
+            //            GetMythDownloadManager()->download(url, &dl_file, false);
+
+            GetMythDownloadManager()->queueDownload(url, destfile, NULL, false);
+
+            // qDebug() << "size of downloaded file is " << dl_file.size();
+
+
+
+            /*
+
+
+                        QFile file(destfile);
+
+                        if (file.open(QIODevice::WriteOnly))
+                        {
+                            file.write(gUncompress(dl_file));
+                            file.close();
+                            LOG(VB_GENERAL, LOG_INFO, QString("Downloaded file %1").arg(destfile));
+                        }
+                        else
+                        {
+                            LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not create file %1").arg(destfile));
+                            return false;
+                        } */
+        }
+
+
+        qDebug() << "Sleeping";
+        sleep(30);
+        qDebug() << "Done sleeping";
+
+        QDir dir;
+        dir = QDir(tempDLDirectory);
+        QStringList files;
+        QString searchfor = "*_sched.txt.gz";
+
+        files = dir.entryList(QStringList(searchfor), QDir::Files | QDir::NoSymLinks);
+
+        QStringListIterator j(files);
+
+        QByteArray filedata;
+        QString gzFile;
+
+        while (j.hasNext())
+        {
+            gzFile = tempDLDirectory + "/" + j.next().toLocal8Bit();
+
+            QFile file(gzFile);
+
+            if (!file.open(QIODevice::ReadOnly))
             {
-                destfile = "/tmp/" + xmltvid + "_sched.txt";
+                LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not open file %1").arg(gzFile));
+            }
+
+                filedata = file.readAll();
+            file.close();
+            gzFile.chop(3); // Remove the .gz
+
+            QFile file_w(gzFile);
+
+            if (file_w.open(QIODevice::WriteOnly))
+            {
+                file_w.write(gUncompress(filedata));
+                file_w.close();
+                LOG(VB_GENERAL, LOG_INFO, QString("Downloaded file %1").arg(gzFile));
             }
             else
             {
-                destfile = "/tmp/" + xmltvid + "_meta.txt";
-            }
-
-            GetMythDownloadManager()->download(url, &dl_file, false);
-            QFile file(destfile);
-
-            if (file.open(QIODevice::WriteOnly))
-            {
-                file.write(gUncompress(dl_file));
-                file.close();
-                LOG(VB_GENERAL, LOG_INFO, QString("Downloaded file %1").arg(destfile));
-
-            }
-            else
-            {
-                LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not create file %1").arg(destfile));
+                LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not create file %1").arg(gzFile));
                 return false;
             }
         }
 
         return true;
-    } // end of downloading schedules or metadata
+    } // end of downloading schedules
 
     if (whattoget == "lineup")
     {
         QString lineup, device;
+        QByteArray dl_file;
 
         lineup = source.lineupid.section(':', 0, 0);
         device = source.lineupid.section(':', 1, 1);
@@ -1636,8 +1691,8 @@ bool FillData::ProcessXMLTV_URL(Source source)
     foreach(QVariant chanmap, result["StationID"].toList())
     {
         QVariantMap chan = chanmap.toMap();
-//        qDebug() << "statid" <<  chan["stationid"].toString();
-//        qDebug() << "url" << chan["url"].toString();
+        //        qDebug() << "statid" <<  chan["stationid"].toString();
+        //        qDebug() << "url" << chan["url"].toString();
 
         update.bindValue(":URL", chan["url"].toString());
         update.bindValue(":XMLTVID", chan["stationid"].toString());
@@ -1913,13 +1968,6 @@ bool FillData::Run(SourceList &sourcelist)
             if (!DownloadSDFiles(randhash, "schedule", *it))
             {
                 fatalErrors.push_back("Error downloading schedules from Schedules Direct.");
-                break;
-            }
-
-            if (!DownloadSDFiles(randhash, "meta", *it))
-            {
-                // Meta data is things like callsign.
-                fatalErrors.push_back("Error downloading station metadata from Schedules Direct.");
                 break;
             }
 
