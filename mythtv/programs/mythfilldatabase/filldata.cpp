@@ -584,7 +584,7 @@ QString FillData::GetSDLoginRandhash(Source source)
 }
 
 // Schedules Direct download various files.
-bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source source)
+bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source source, QString tempDLDirectory)
 {
 
     QString urlbase = "http://ec2-50-17-151-67.compute-1.amazonaws.com/proc.php";
@@ -618,7 +618,6 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
         LOG(VB_GENERAL, LOG_INFO, QString("%1 unique XMLIDs to download").arg(total_XMLID));
 
-        QString tempDLDirectory = ddprocessor.CreateTempDirectory();
 
         while (query.next())
             // We're going to update all chanid's in the database that use this
@@ -635,46 +634,33 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
             destfile = tempDLDirectory + "/" + xmltvid + "_sched.txt.gz";
 
-            //            QByteArray dl_file;
-
-            //            GetMythDownloadManager()->download(url, &dl_file, false);
-
             GetMythDownloadManager()->queueDownload(url, destfile, NULL, false);
-
-            // qDebug() << "size of downloaded file is " << dl_file.size();
-
-
-
-            /*
-
-
-                        QFile file(destfile);
-
-                        if (file.open(QIODevice::WriteOnly))
-                        {
-                            file.write(gUncompress(dl_file));
-                            file.close();
-                            LOG(VB_GENERAL, LOG_INFO, QString("Downloaded file %1").arg(destfile));
-                        }
-                        else
-                        {
-                            LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not create file %1").arg(destfile));
-                            return false;
-                        } */
         }
-
-
-        qDebug() << "Sleeping";
-        sleep(30);
-        qDebug() << "Done sleeping";
 
         QDir dir;
         dir = QDir(tempDLDirectory);
         QStringList files;
         QString searchfor = "*_sched.txt.gz";
 
-        files = dir.entryList(QStringList(searchfor), QDir::Files | QDir::NoSymLinks);
+        int LoopCount = 0;
 
+        while (LoopCount < 12) // Determine the best loop count / sleep combination to download files.
+        {
+            qDebug() << "Sleeping";
+            sleep(5);
+            LoopCount++;
+
+            files = dir.entryList(QStringList(searchfor), QDir::Files | QDir::NoSymLinks);
+
+            if (files.size() == total_XMLID)
+            {
+                qDebug() << "Done sleeping";
+                LoopCount = 99; // Magic value to let routine down the line know that we didn't get all files?
+                break;
+            }
+        }
+
+        files = dir.entryList(QStringList(searchfor), QDir::Files | QDir::NoSymLinks);
         QStringListIterator j(files);
 
         QByteArray filedata;
@@ -691,7 +677,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
                 LOG(VB_GENERAL, LOG_ERR, LOC + QString("Could not open file %1").arg(gzFile));
             }
 
-                filedata = file.readAll();
+            filedata = file.readAll();
             file.close();
             gzFile.chop(3); // Remove the .gz
 
@@ -743,7 +729,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
         url = urlbase + "?command=get&p1=lineup&p2=" + lineup;
         GetMythDownloadManager()->download(url, &dl_file, false);
-        destfile = "/tmp/" + lineup + ".txt";
+        destfile = tempDLDirectory + "/" + lineup + ".txt";
 
         QFile file(destfile);
 
@@ -789,7 +775,7 @@ bool FillData::getSchedulesDirectStatusMessages(QString randhash)
 
 
 // Schedules Direct check for lineup update
-int FillData::is_SDHeadendVersionUpdated(Source source)
+int FillData::is_SDHeadendVersionUpdated(Source source, QString tempDLDirectory)
 // return a -1 for error, 0 for not updated, 1 for updated.
 {
     QString lineup, device;
@@ -818,9 +804,9 @@ int FillData::is_SDHeadendVersionUpdated(Source source)
         device = "Analog";
     }
 
-    DownloadSDFiles("", "lineup", source);
+    DownloadSDFiles("", "lineup", source, tempDLDirectory);
 
-    QString filename = "/tmp/" + lineup + ".txt";
+    QString filename = tempDLDirectory + "/" + lineup + ".txt";
 
     QFile inputfile(filename);
 
@@ -1163,7 +1149,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
 
 // Schedules Direct json-formatted data
-bool FillData::InsertSDDataintoDatabase(Source source)
+bool FillData::InsertSDDataintoDatabase(Source source, QString tempdir)
 {
     // Information relating to schedules
     QString lineupid = source.lineupid;
@@ -1211,7 +1197,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
     updateLastRunStatus(startstopstatus_query, status);
 
     QDir dir;
-    dir = QDir("/tmp");
+    dir = QDir(tempdir);
     QStringList files;
     QString searchfor = "*_sched.txt";
 
@@ -1229,7 +1215,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 
         QString filename = j.next().toLocal8Bit();
 
-        QFile inputfile("/tmp/" + filename);
+        QFile inputfile(tempdir + "/" + filename);
 
         if (!inputfile.open(QIODevice::ReadOnly))
         {
@@ -1632,7 +1618,7 @@ bool FillData::InsertSDDataintoDatabase(Source source)
 }
 
 
-bool FillData::ProcessXMLTV_URL(Source source)
+bool FillData::ProcessXMLTV_URL(Source source, QString tempDLDirectory)
 {
     QString lineup, device;
 
@@ -1660,7 +1646,7 @@ bool FillData::ProcessXMLTV_URL(Source source)
         device = "Analog";
     }
 
-    QString filename = "/tmp/" + lineup + ".txt";
+    QString filename = tempDLDirectory + "/" + lineup + ".txt";
 
     QFile inputfile(filename);
 
@@ -1934,9 +1920,10 @@ bool FillData::Run(SourceList &sourcelist)
                 LOG(VB_GENERAL, LOG_ERR, LOC + QString("Error determining if Schedules Direct headend has been updated."));
                 break;
             }
+            QString tempDLDirectory = ddprocessor.CreateTempDirectory();
 
-            DownloadSDFiles(randhash, "status", *it);
-            int retval = is_SDHeadendVersionUpdated(*it);
+            DownloadSDFiles(randhash, "status", *it, tempDLDirectory);
+            int retval = is_SDHeadendVersionUpdated(*it, tempDLDirectory);
 
             if (retval == -1)
             {
@@ -1952,7 +1939,7 @@ bool FillData::Run(SourceList &sourcelist)
             }
 
             // Not needed anymore? If the lineup is new,
-            if (!DownloadSDFiles(randhash, "lineup", *it))
+            if (!DownloadSDFiles(randhash, "lineup", *it, tempDLDirectory))
             {
                 // The lineup is the map of channel numbers to XMLIDs in a particular headend.
                 fatalErrors.push_back("Error downloading lineup information from Schedules Direct.");
@@ -1961,16 +1948,16 @@ bool FillData::Run(SourceList &sourcelist)
             else
             {
                 // Valid download, so update the table that tracks the download location for a XMLID.
-                ProcessXMLTV_URL(*it);
+                ProcessXMLTV_URL(*it, tempDLDirectory);
             }
 
-            if (!DownloadSDFiles(randhash, "schedule", *it))
+            if (!DownloadSDFiles(randhash, "schedule", *it, tempDLDirectory))
             {
                 fatalErrors.push_back("Error downloading schedules from Schedules Direct.");
                 break;
             }
 
-            if (!InsertSDDataintoDatabase(*it))
+            if (!InsertSDDataintoDatabase(*it, tempDLDirectory))
             {
                 fatalErrors.push_back("Error inserting schedule from Schedules Direct.");
                 break;

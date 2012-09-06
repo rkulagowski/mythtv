@@ -81,12 +81,12 @@ public:
                             const QString &lineupid, QDate *qCurrentDate = 0);
 
     QString GetSDLoginRandhash(Source source);
-    bool DownloadSDFiles(QString randhash, QString whattoget, Source source);
-    bool InsertSDDataintoDatabase(Source source);
-    int is_SDHeadendVersionUpdated(Source source);
+    bool DownloadSDFiles(QString randhash, QString whattoget, Source source, QString tempDLDirectory);
+    bool InsertSDDataintoDatabase(Source source, QString tempDLDirectory);
+    int is_SDHeadendVersionUpdated(Source source, QString tempDLDirectory);
     bool getSchedulesDirectStatusMessages(QString randhash);
     int UpdateChannelTablefromSD(Source source);
-    bool ProcessXMLTV_URL(Source source);
+    bool ProcessXMLTV_URL(Source source, QString tempDLDirectory);
 
     bool Run(SourceList &sourcelist);
     ChanInfo *xawtvChannel(QString &id, QString &channel, QString &fine);
