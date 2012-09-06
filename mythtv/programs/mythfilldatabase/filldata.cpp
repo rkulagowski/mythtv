@@ -644,7 +644,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
 
         int LoopCount = 0;
 
-        while (LoopCount < 12) // Determine the best loop count / sleep combination to download files.
+        while (LoopCount < 60) // Determine the best loop count / sleep combination to download files.
         {
             qDebug() << "Sleeping";
             sleep(5);
@@ -658,6 +658,7 @@ bool FillData::DownloadSDFiles(QString randhash, QString whattoget, Source sourc
                 LoopCount = 99; // Magic value to let routine down the line know that we didn't get all files?
                 break;
             }
+            qDebug() << "Downloaded " << files.size() << "of " << total_XMLID;
         }
 
         files = dir.entryList(QStringList(searchfor), QDir::Files | QDir::NoSymLinks);
