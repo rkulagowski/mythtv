@@ -2277,9 +2277,8 @@ NULL
             return false;
     }
 
-    return true;
-
-// One day this will get commited, but for now do it manually.
+// Alter tables to support the additional information we can get using the
+// schedulesdirect2 grabber
     if (dbver == "1307")
     {
         const char *updates[] = {
@@ -2354,12 +2353,13 @@ NULL
 "url VARCHAR(1024),",
 "PRIMARY KEY(xmltvid)",
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
-
 NULL
 };
         if (!performActualUpdate(updates, "1308", dbver))
             return false;
     }
+
+    return true;
 
 }
 
