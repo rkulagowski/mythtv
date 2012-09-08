@@ -115,11 +115,11 @@ package MythTV;
 # schema version supported in the main code.  We need to check that the schema
 # version in the database is as expected by the bindings, which are expected
 # to be kept in sync with the main code.
-    our $SCHEMA_VERSION = "1307";
+    our $SCHEMA_VERSION = "1308";
 
 # NUMPROGRAMLINES is defined in mythtv/libs/libmythtv/programinfo.h and is
 # the number of items in a ProgramInfo QStringList group used by
-# ProgramInfo::ToSringList and ProgramInfo::FromStringList.
+# ProgramInfo::ToStringList and ProgramInfo::FromStringList.
     our $NUMPROGRAMLINES = 44;
 
 # Reasons a recording wouldn't be happening (from libs/libmythtv/programinfo.h)

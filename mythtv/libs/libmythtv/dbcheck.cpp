@@ -450,7 +450,7 @@ bool UpgradeTVDatabaseSchema(const bool upgradeAllowed,
 #endif
     SchemaUpgradeWizard *schema_wizard = NULL;
 
-    // Suppress DB messages and turn of the settings cache,
+    // Suppress DB messages and turn off the settings cache,
     // These are likely to confuse the users and the code, respectively.
     GetMythDB()->SetSuppressDBMessages(true);
     gCoreContext->ActivateSettingsCache(false);
@@ -2277,10 +2277,11 @@ NULL
             return false;
     }
 
-// Alter tables to support the additional information we can get using the
-// schedulesdirect2 grabber
     if (dbver == "1307")
     {
+// Alter tables to support the additional information we can get using the
+// schedulesdirect2 grabber
+
         const char *updates[] = {
 "ALTER TABLE videosource ADD COLUMN version INTEGER UNSIGNED NOT NULL DEFAULT '0';",
 "ALTER TABLE videosource ADD COLUMN modified DATE DEFAULT '0000-00-00';",
@@ -2334,28 +2335,28 @@ NULL
 "ALTER TABLE recordedrating ADD fantasyviolence BOOLEAN;",
 "ALTER TABLE credits DROP COLUMN role;",
 "ALTER TABLE credits ADD COLUMN role VARCHAR(30);",
-"CREATE TABLE programadvisories (",
-"chanid INT(10) UNSIGNED NOT NULL DEFAULT '0',",
-"starttime DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',",
-"message VARCHAR(30) NOT NULL DEFAULT '',",
-"PRIMARY KEY (chanid, starttime, message),",
-"KEY message(message)",
+"CREATE TABLE programadvisories ("
+"chanid INT(10) UNSIGNED NOT NULL DEFAULT '0',"
+"starttime DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',"
+"message VARCHAR(30) NOT NULL DEFAULT '',"
+"PRIMARY KEY (chanid, starttime, message),"
+"KEY message(message)"
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
-"CREATE TABLE programholiday (",
-"chanid INT(10) UNSIGNED NOT NULL DEFAULT '0',",
-"starttime DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',",
-"holiday VARCHAR(30) NOT NULL DEFAULT '',",
-"PRIMARY KEY (chanid, starttime, holiday),",
-"KEY holiday(holiday)",
+"CREATE TABLE programholiday ("
+"chanid INT(10) UNSIGNED NOT NULL DEFAULT '0',"
+"starttime DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',"
+"holiday VARCHAR(30) NOT NULL DEFAULT '',"
+"PRIMARY KEY (chanid, starttime, holiday),"
+"KEY holiday(holiday)"
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
-"CREATE TABLE url_map (",
-"xmltvid VARCHAR(64),",
-"url VARCHAR(1024),",
-"PRIMARY KEY(xmltvid)",
+"CREATE TABLE url_map ("
+"xmltvid VARCHAR(64),"
+"url VARCHAR(1024),"
+"PRIMARY KEY(xmltvid)"
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",
 NULL
 };
-        if (!performActualUpdate(updates, "1308", dbver))
+        if (!performActualUpdate(&updates[0], "1308", dbver))
             return false;
     }
 
@@ -3001,8 +3002,6 @@ bool InitializeMythSchema(void)
 "  title varchar(128) NOT NULL DEFAULT '',"
 "  subtitle varchar(128) NOT NULL DEFAULT '',"
 "  description varchar(16000) NOT NULL DEFAULT '',"
-"  season smallint(5),"
-"  episode smallint(5),"
 "  category varchar(64) NOT NULL DEFAULT '',"
 "  category_type varchar(64) NOT NULL DEFAULT '',"
 "  airdate year(4) NOT NULL DEFAULT '0000',"
@@ -3055,11 +3054,6 @@ bool InitializeMythSchema(void)
 "  starttime datetime NOT NULL DEFAULT '0000-00-00 00:00:00',"
 "  system varchar(8) DEFAULT NULL,"
 "  rating varchar(16) DEFAULT NULL,"
-"  adultsituation boolean,"
-"  violence boolean,"
-"  language boolean,"
-"  dialog boolean,"
-"  fantasyviolence,"
 "  UNIQUE KEY chanid (chanid,starttime,system,rating),"
 "  KEY starttime (starttime,system)"
 ") ENGINE=MyISAM DEFAULT CHARSET=utf8;",

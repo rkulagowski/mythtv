@@ -9,7 +9,7 @@
 
 class MythBackend {
 
-// MYTH_PROTO_VERSION is defined in libmyth in mythtv/libs/libmyth/mythcontext.h
+// MYTH_PROTO_VERSION is defined in libmythbase in libs/libmythbase/mythversion.h
 // and should be the current MythTV protocol version.
     static $protocol_version        = '75';
     static $protocol_token          = 'SweetRock';
@@ -51,7 +51,7 @@ class MythBackend {
         $this->host         = $host;
         $this->ip           = _or(setting('BackendServerIP', $this->host), $host);
 
-        // If the IP contains a ':' It's likely an IPv6 address so enclose it in '[]'
+        // If the IP contains a ':' it's likely an IPv6 address, so enclose it in '[]'
         if (strpos($this->ip,":") > 0) {
             $this->ip = "[" . $this->ip . "]";
         }
