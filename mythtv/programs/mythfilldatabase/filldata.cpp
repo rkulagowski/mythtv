@@ -792,7 +792,7 @@ int FillData::is_SDHeadendVersionUpdated(Source source, QString tempDLDirectory)
 
     QString a = lineup.left(3);
 
-    if (a == "4DT" || a == "AFN" || a == "C-B" || a == "DIT" || a == "DIS" || a == "ECH" || a == "GLO")
+    if (a == "4DT" || a == "AFN" || a == "C-B" || a == "DIT" || a == "DIS" || a == "ECH" || a == "GLO" || a == "FTA")
     {
         device = "Satellite";
     }
@@ -864,7 +864,7 @@ int FillData::is_SDHeadendVersionUpdated(Source source, QString tempDLDirectory)
     return 1;
 }
 
-int FillData::UpdateChannelTablefromSD(Source source)
+int FillData::UpdateChannelTablefromSD(Source source, QString tempDLDirectory)
 // return a -1 for error, 0 for not updated, 1 for updated.
 {
     QString lineup, device;
@@ -880,7 +880,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
 
     QString a = lineup.left(3);
 
-    if (a == "4DT" || a == "AFN" || a == "C-B" || a == "DIT" || a == "DIS" || a == "ECH" || a == "GLO")
+    if (a == "4DT" || a == "AFN" || a == "C-B" || a == "DIT" || a == "DIS" || a == "ECH" || a == "GLO" || a == "FTA")
     {
         device = "Satellite";
     }
@@ -893,7 +893,7 @@ int FillData::UpdateChannelTablefromSD(Source source)
         device = "Analog";
     }
 
-    QString filename = "/tmp/" + lineup + ".txt";
+    QString filename = tempDLDirectory + "/" + lineup + ".txt";
 
     QFile inputfile(filename);
 
@@ -1936,7 +1936,7 @@ bool FillData::Run(SourceList &sourcelist)
             else if (retval == 1)
             {
                 LOG(VB_GENERAL, LOG_INFO, QString("Headend has been updated. Refreshing channel table."));
-                UpdateChannelTablefromSD(*it);
+                UpdateChannelTablefromSD(*it, tempDLDirectory);
             }
 
             // Not needed anymore? If the lineup is new,

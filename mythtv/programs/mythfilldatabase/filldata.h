@@ -85,7 +85,7 @@ public:
     bool InsertSDDataintoDatabase(Source source, QString tempDLDirectory);
     int is_SDHeadendVersionUpdated(Source source, QString tempDLDirectory);
     bool getSchedulesDirectStatusMessages(QString randhash);
-    int UpdateChannelTablefromSD(Source source);
+    int UpdateChannelTablefromSD(Source source, QString tempDLDirectory);
     bool ProcessXMLTV_URL(Source source, QString tempDLDirectory);
 
     bool Run(SourceList &sourcelist);
