@@ -927,11 +927,24 @@ int FillData::UpdateChannelTablefromSD(Source source, QString tempDLDirectory)
 
     foreach(QVariant devtypes, result["DeviceTypes"].toList())
     {
-        //        qDebug() << "device is" << devtypes.toString();
         QVariantMap nestedLineupInfo = result[devtypes.toString()].toMap();
 
         if (devtypes.toString() == device)
         {
+            if (device == "Satellite")
+            {
+              if (lineup == "FTA")
+              {
+                foreach(QVariant satlist, result["Satellite"].toList())
+                {
+                
+                }
+              }
+
+            }
+
+
+
             if (device != "Antenna")
             {
                 foreach(QVariant chanmap, nestedLineupInfo["map"].toList())
@@ -1124,7 +1137,7 @@ int FillData::UpdateChannelTablefromSD(Source source, QString tempDLDirectory)
                     }
                 } // done iterating through all the qam tuples
 
-            } // if block done ("qamdata" wasn't empty, so there was at least one qam entry
+            } // if block done ("qamdata" wasn't empty, so there was at least one qam entry)
         } // end of updating the channel table which matches the devicetype
     } //end of the outer json loop
 
